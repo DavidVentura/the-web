@@ -16,7 +16,7 @@ function_addrs = []
 entrypoint_fn_id = -1
 operand_stack = []
 call_stack = []
-
+register_stack = []  # TODO, how to do this properly?
 
 
 @dataclass
@@ -74,7 +74,7 @@ class CPU:
     def execute(self):
         assert self.fetched_instr
         i = Instr(self.fetched_instr)
-        print(f'executing {i}')
+        print(f'[E] {i} with [{hex(self.payload)}]')
         match i:
             case Instr.i32_const:
                 operand_stack.append(self.payload)
@@ -85,25 +85,26 @@ class CPU:
             case Instr.drop:
                 operand_stack.pop()
             case Instr.call:
-                # set up locals based on stack,need to keep type info
-                # FIXME #
+                print(f"saving registers: {self.registers}")
+                register_stack.append(self.registers.copy())
+                call_stack.append(self.pc)
                 self.registers[0] = operand_stack.pop()
                 self.registers[1] = operand_stack.pop()
-                call_stack.append(self.pc)
                 self.pc = function_addrs[self.payload]
-                print(f"calling into fn {self.payload}, registers: {self.registers}, opstack {operand_stack}, cs {call_stack}")
+                print(f"[CALL] {self.payload},\n registers: {self.registers}\n opstack {operand_stack}\n cs {call_stack}\n rs {register_stack}")
             case Instr.end_of_func:
                 if not call_stack:
                     self.state = CPU.HALT
                     return
                 self.pc = call_stack.pop()
-                print('ret from', call_stack)
+                self.registers = register_stack.pop()
+                print(f'ret from {call_stack}, regs are {self.registers}')
             case Instr.local_get:
                 operand_stack.append(self.registers[self.payload])
             case _:
                 raise NotImplementedError(f"Can't exec instr {i}")
 
-        print("stack is now", operand_stack)
+        print("[S]", operand_stack)
         self.state = CPU.FETCH_INSTR
 
     def step(self):
@@ -112,12 +113,11 @@ class CPU:
                 assert self.fetched_instr
                 byte = self.fetch()
                 self.payload |= (byte & 0b0111_111) << (7*self.cur_data_byte)
-                log.debug(f'LE128 fetched byte #{self.cur_data_byte} = {self.payload}')
+                log.debug(f'[LE128] #{self.cur_data_byte} = {self.payload}')
                 if _incomplete_leb(byte):
                     self.cur_data_byte += 1
                 else:
                     self.state = CPU.EXEC
-                    print(f'finished reading le128, exec now {Instr(self.fetched_instr)} with [{hex(self.payload)}]')
             case CPU.FETCH_INSTR:
                 self.payload = 0
                 self.cur_data_byte = 0
