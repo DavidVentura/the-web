@@ -137,13 +137,13 @@ def read_leb128(at: int) -> tuple[int, int]:
     res = 0
     counter = 0
     while _incomplete_leb(program[at]):
-        res += (program[at] & 0b0111_111) << (7*counter)
+        res += (program[at] & 0b0111_1111) << (7*counter)
         at += 1
         counter += 1
         if at >= 15:
             raise ValueError("leb128 too big")
 
-    res += (program[at] & 0b0111_111) << (7*counter)
+    res += (program[at] & 0b0111_1111) << (7*counter)
     counter += 1
     return res, counter
 
