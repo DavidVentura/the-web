@@ -15,6 +15,8 @@ mem = [0] * 1024
 function_addrs = []
 entrypoint_fn_id = -1
 operand_stack = []
+call_stack = []
+
 
 
 @dataclass
@@ -27,6 +29,7 @@ class Instr(enum.Enum):
     drop = 0x1A
     end_of_func = 0xB
     i32_add = 0x6a
+    local_get = 0x20
 
 class CPU:
     FETCH_INSTR = 0
@@ -41,10 +44,11 @@ class CPU:
         self.fetched_instr = None
         self.payload = 0
         self.cur_data_byte = 0
+        self.registers = [0] * 4 # how many registers are reasonable?
 
     def fetch(self) -> int:
         byte = program[self.pc]
-        print('fetched', hex(byte))
+        log.debug('fetched', hex(byte))
         self.pc += 1
         return byte
 
@@ -52,17 +56,20 @@ class CPU:
         assert self.fetched_instr
         i = Instr(self.fetched_instr)
         match i:
+            case Instr.local_get:
+                self.state = self.FETCH_LE128
             case Instr.i32_const:
                 self.state = self.FETCH_LE128
-                print('was const, fetching le128')
             case Instr.i32_add:
                 self.state = CPU.EXEC
             case Instr.drop:
                 self.state = CPU.EXEC
             case Instr.end_of_func:
                 self.state = CPU.EXEC
+            case Instr.call:
+                self.state = self.FETCH_LE128
             case _:
-                raise NotImplementedError(f"Can't exec instr {i}")
+                raise NotImplementedError(f"Can't decode instr {i}")
 
     def execute(self):
         assert self.fetched_instr
@@ -77,12 +84,24 @@ class CPU:
                 operand_stack.append(a+b)
             case Instr.drop:
                 operand_stack.pop()
+            case Instr.call:
+                # set up locals based on stack,need to keep type info
+                # FIXME #
+                self.registers[0] = operand_stack.pop()
+                self.registers[1] = operand_stack.pop()
+                call_stack.append(self.pc)
+                self.pc = function_addrs[self.payload]
+                print(f"calling into fn {self.payload}, registers: {self.registers}, opstack {operand_stack}, cs {call_stack}")
             case Instr.end_of_func:
-                # TODO: callstack
-                self.state = CPU.HALT
-                return
+                if not call_stack:
+                    self.state = CPU.HALT
+                    return
+                self.pc = call_stack.pop()
+                print('ret from', call_stack)
+            case Instr.local_get:
+                operand_stack.append(self.registers[self.payload])
             case _:
-                raise NotImplementedError(f"Can't exec instr {hex(self.fetched_instr)}")
+                raise NotImplementedError(f"Can't exec instr {i}")
 
         print("stack is now", operand_stack)
         self.state = CPU.FETCH_INSTR
@@ -90,14 +109,15 @@ class CPU:
     def step(self):
         match self.state:
             case CPU.FETCH_LE128:
+                assert self.fetched_instr
                 byte = self.fetch()
                 self.payload |= (byte & 0b0111_111) << (7*self.cur_data_byte)
-                print(f'LE128 fetched byte #{self.cur_data_byte} = {self.payload}')
+                log.debug(f'LE128 fetched byte #{self.cur_data_byte} = {self.payload}')
                 if _incomplete_leb(byte):
                     self.cur_data_byte += 1
                 else:
                     self.state = CPU.EXEC
-                    print(f'finished reading le128, exec now {hex(self.fetched_instr)} with [{hex(self.payload)}]')
+                    print(f'finished reading le128, exec now {Instr(self.fetched_instr)} with [{hex(self.payload)}]')
             case CPU.FETCH_INSTR:
                 self.payload = 0
                 self.cur_data_byte = 0
