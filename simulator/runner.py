@@ -13,6 +13,8 @@ if not program.startswith(WASM_V1_MAGIC):
 
 mem = [0] * 1024
 function_addrs = []
+function_type_info = []
+params_in_type = []
 entrypoint_fn_id = -1
 operand_stack = []
 call_stack = []
@@ -85,20 +87,22 @@ class CPU:
             case Instr.drop:
                 operand_stack.pop()
             case Instr.call:
-                print(f"saving registers: {self.registers}")
+                log.debug(f"saving registers: {self.registers}")
                 register_stack.append(self.registers.copy())
                 call_stack.append(self.pc)
-                self.registers[0] = operand_stack.pop()
-                self.registers[1] = operand_stack.pop()
+                param_count = function_type_info[self.payload]
+                for i in range(param_count):
+                    self.registers[i] = operand_stack.pop()
                 self.pc = function_addrs[self.payload]
-                print(f"[CALL] {self.payload},\n registers: {self.registers}\n opstack {operand_stack}\n cs {call_stack}\n rs {register_stack}")
+                log.debug(f"[CALL] {self.payload},\n registers: {self.registers}\n opstack {operand_stack}\n cs {call_stack}\n rs {register_stack}")
+
             case Instr.end_of_func:
                 if not call_stack:
                     self.state = CPU.HALT
                     return
                 self.pc = call_stack.pop()
                 self.registers = register_stack.pop()
-                print(f'ret from {call_stack}, regs are {self.registers}')
+                log.debug(f'ret from {call_stack}, regs are {self.registers}')
             case Instr.local_get:
                 operand_stack.append(self.registers[self.payload])
             case _:
@@ -163,9 +167,37 @@ def read_section(at: int):
     log.debug(f'section {section} of size {section_size}')
     match section:
         case Section.TYPE:
-            at += section_size
+            type_cnt, read = read_leb128(at)
+            log.debug('type cnt', type_cnt, at, read)
+            at += read
+            for idx in range(type_cnt):
+                typetag, read = read_leb128(at)
+                assert typetag == 0x60, hex(typetag)
+                at += read
+                param_cnt, read = read_leb128(at)
+                at += read
+                args = []
+                for i in range(param_cnt):
+                    param_type, read = read_leb128(at)
+                    at += read
+                    args.append(param_type)
+                params_in_type.append(param_cnt)
+                ret_cnt, read = read_leb128(at)
+                at += read
+
+                ret= []
+                for i in range(ret_cnt):
+                    ret_type, read = read_leb128(at)
+                    at += read
+                    ret.append(ret_type)
+
         case Section.FUNCTION:
-            at += section_size
+            cnt, read = read_leb128(at)
+            at += read
+            for i in range(cnt):
+                type_idx, read = read_leb128(at)
+                function_type_info.append(params_in_type[type_idx])
+                at += read
         case Section.EXPORT:
             at += section_size
         case Section.START:
