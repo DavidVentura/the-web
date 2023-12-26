@@ -191,21 +191,26 @@ def read_section(at: int):
                     at += read
                     ret.append(ret_type)
 
+                log.debug(f"for func {idx} got {param_cnt} params and {ret_cnt} ret")
+
         case Section.FUNCTION:
             cnt, read = read_leb128(at)
             at += read
             for i in range(cnt):
                 type_idx, read = read_leb128(at)
                 function_type_info.append(params_in_type[type_idx])
+                log.debug(f'for func {i} got type_idx {type_idx}')
                 at += read
+
         case Section.EXPORT:
             at += section_size
+
         case Section.START:
             global entrypoint_fn_id
             entrypoint_fn_id, read = read_leb128(at)
             at += read
-
             log.debug('start fn id', entrypoint_fn_id)
+
         case Section.CODE:
             functions_count, read = read_leb128(at)
             at += read
@@ -213,14 +218,20 @@ def read_section(at: int):
             for i in range(functions_count):
                 fsize, read = read_leb128(at)
                 at += read
-                locals_of_this_type, read = read_leb128(at)
+                log.debug(f"func {i}, is of size{fsize}")
+                local_blocks, read = read_leb128(at)
                 at += read
                 type_info_read = read
-                if locals_of_this_type > 0:
+                log.debug(f"at func {i}, found {local_blocks} types of locals")
+                for j in range(local_blocks):
+                    local_count, read = read_leb128(at)
+                    at += read
+                    type_info_read += read
+
                     type_of_locals, read = read_leb128(at)
                     at += read
                     type_info_read += read
-                    log.debug(f"found {locals_of_this_type} locals of type {type_of_locals}")
+                    log.debug(f"found {local_count} locals of type {type_of_locals}")
                     
                 code_size = fsize - type_info_read
                 log.debug('code size', code_size)
