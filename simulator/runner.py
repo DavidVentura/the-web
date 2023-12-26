@@ -166,6 +166,7 @@ def read_leb128(at: int) -> tuple[int, int]:
 
 class Section(enum.Enum):
     TYPE = 1
+    IMPORT = 2
     FUNCTION = 3
     EXPORT = 7
     START = 8
@@ -204,6 +205,36 @@ def read_section(at: int):
                     ret.append(ret_type)
 
                 log.debug(f"for func {idx} got {param_cnt} params and {ret_cnt} ret")
+
+        case Section.IMPORT:
+            cnt, read = read_leb128(at)
+            at += read
+            for i in range(cnt):
+                module_len, read = read_leb128(at)
+                at += read
+                module_name = program[at:at+module_len]
+                at += module_len
+                log.debug("module name", module_name)
+
+                import_name_len, read = read_leb128(at)
+                at += read
+                import_name = program[at:at+import_name_len]
+                at += import_name_len
+                log.debug("import name", import_name)
+
+                type_id, read = read_leb128(at)
+                at += read
+                assert type_id == 0, type_id
+
+                type_idx, read = read_leb128(at)
+                log.debug("type idx", type_idx)
+                at += read
+
+                function_type_info.append(params_in_type[type_idx])
+
+                # TODO: populatae microcode?
+                func_addr = 0
+                function_addrs.append(func_addr)
 
         case Section.FUNCTION:
             cnt, read = read_leb128(at)
