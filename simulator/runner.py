@@ -31,7 +31,9 @@ class Instr(enum.Enum):
     drop = 0x1A
     end_of_func = 0xB
     i32_add = 0x6a
+    i32_mul = 0x6c
     local_get = 0x20
+    local_set = 0x21
 
 class CPU:
     FETCH_INSTR = 0
@@ -62,7 +64,11 @@ class CPU:
                 self.state = self.FETCH_LE128
             case Instr.i32_const:
                 self.state = self.FETCH_LE128
+            case Instr.local_set:
+                self.state = self.FETCH_LE128
             case Instr.i32_add:
+                self.state = CPU.EXEC
+            case Instr.i32_mul:
                 self.state = CPU.EXEC
             case Instr.drop:
                 self.state = CPU.EXEC
@@ -80,6 +86,10 @@ class CPU:
         match i:
             case Instr.i32_const:
                 operand_stack.append(self.payload)
+            case Instr.i32_mul:
+                a = operand_stack.pop()
+                b = operand_stack.pop()
+                operand_stack.append(a*b)
             case Instr.i32_add:
                 a = operand_stack.pop()
                 b = operand_stack.pop()
@@ -103,6 +113,8 @@ class CPU:
                 self.pc = call_stack.pop()
                 self.registers = register_stack.pop()
                 log.debug(f'ret from {call_stack}, regs are {self.registers}')
+            case Instr.local_set:
+                self.registers[self.payload] = operand_stack.pop()
             case Instr.local_get:
                 operand_stack.append(self.registers[self.payload])
             case _:
