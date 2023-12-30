@@ -9,3 +9,4 @@ Simple simulator in Python.
 - [Code exporer](https://wasdk.github.io/wasmcodeexplorer/)
 - [MDN WASM Page](https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format)
 - [Understanding every byte in a WASM Module](https://danielmangum.com/posts/every-byte-wasm-module/)
+- [WebAssembly Opcodes](https://pengowray.github.io/wasm-ops/)
