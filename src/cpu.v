@@ -1,8 +1,8 @@
 module cpu(
     input clk,
 	output [31:0] addr,
-	output  [7:0] data_in,
-	input [7:0] data_out,
+	output [7:0] data_in,
+	input  [7:0] data_out,
 	output memory_read_en,
 	output memory_write_en,
 	input memory_ready
@@ -11,13 +11,20 @@ module cpu(
 	reg [31:0] pc = 8'h1A;
 	reg [7:0]  instruction = 0;
 	reg [63:0] instr_imm = 0;
-	reg [63:0] op_stack [127:0];
-	reg [6:0]  op_stack_top = 0;
+	reg [63:0] registers [31:0];
+	reg [7:0]  needed_operands = 0;
+	reg [7:0]  ready_operands = 0;
+	reg [63:0] _operand [1:0];
 
-	wire [63:0] stack_top = op_stack[op_stack_top];
+	reg exec_done = 0;
 
-	reg [63:0] call_stack [127:0];
-	reg [6:0]  call_stack_top = 0;
+	reg [7:0]  op_stack_top = 8'haa;
+	reg [7:0]  call_stack_top = 8'h55;
+	wire [7:0] _op_stack_top;
+	wire [7:0] _call_stack_top;
+	// maybe export these as debug wires?
+	assign _op_stack_top = op_stack_top;
+	assign _call_stack_top = call_stack_top;
 
 	reg [31:0] addr_r;
 	reg [7:0] data_in_r = 0;
@@ -51,57 +58,74 @@ module cpu(
 	localparam LOCAL_GET 	= 8'H20;
 	localparam LOCAL_SET 	= 8'H21;
 
-	function needs_retrieval(input [7:0] inst);
+	function needs_immediate(input [7:0] inst);
 		begin
 			case(inst)
 				I32_CONST, CALL, LOCAL_GET, LOCAL_SET: begin
-					needs_retrieval = 1;
+					needs_immediate = 1;
 				end
 			default: begin
-					needs_retrieval = 0;
+					needs_immediate = 0;
+				end
+			endcase
+		end
+	endfunction
+	function needs_retrieval(input [7:0] inst);
+		begin
+		end
+	endfunction
+
+	function operands_for_instr(input [7:0] inst, input[63:0] imm);
+		begin
+			case(inst)
+				END_OF_FUNC, LOCAL_SET: begin
+					operands_for_instr = 0;
+				end
+				I32_CONST, DROP, LOCAL_SET: begin
+					operands_for_instr = 1;
+				end
+				I32_ADD, I32_MUL: begin
+					operands_for_instr = 2;
 				end
 			endcase
 		end
 	endfunction
 
 	always @(posedge clk) begin
-		
+		if(memory_write_en_r) memory_write_en_r <= 0;
 	end
-
-	task op_stack_pop(output [63:0] val);
-		begin
-		end
-	endtask
-
-	task op_stack_append(input [63:0] val);
-		begin
-		end
-	endtask
-
-	// temporary values while executing instructions
-	reg [63:0] _tmp_a = 0;
-	reg [63:0] _tmp_b = 0;
-	reg [63:0] _tmp_c = 0;
 	task handle_instruction;
 		begin
 			case(instruction)
 				I32_CONST: begin
 					op_stack_top <= op_stack_top + 1;
-					op_stack[op_stack_top+1] <= instr_imm;
+					addr_r <= op_stack_top;
+					memory_write_en_r <= 1;
+					data_in_r <= instr_imm;
 				end
 				I32_ADD: begin
-					// need retrieve stage?
-					_tmp_a <= op_stack[op_stack_top];
-					_tmp_b <= op_stack[op_stack_top-1];
-					//op_stack[op_stack_top-1] <= _tmp_a + _tmp_b;
-					op_stack[op_stack_top-1] <= op_stack[op_stack_top] + op_stack[op_stack_top-1];
+					addr_r <= op_stack_top;
+					memory_write_en_r <= 1;
+					data_in_r <= _operand[0] + _operand[1];
 					op_stack_top <= op_stack_top - 1;
 				end
 				CALL: begin
-					call_stack[call_stack_top] <= pc;
+					addr_r <= call_stack_top;
 					call_stack_top <= call_stack_top + 1;
+					memory_write_en_r <= 1;
+					data_in_r <= pc;
+				end
+				DROP: begin
+					op_stack_top <= op_stack_top - 1;
+				end
+				END_OF_FUNC: begin
+					// NOP
+				end
+				default: begin
+					$display("No idea how to exec instruction %x", instruction);
 				end
 			endcase
+			exec_done <= 1;
 		end
 	endtask
 
@@ -118,10 +142,11 @@ module cpu(
 				end else begin
 					addr_r <= pc;
 					memory_read_en_r <= 1;
+					exec_done <= 0;
 				end
 			end
 			STATE_DECODE: begin
-				if (needs_retrieval(instruction)) begin
+				if (needs_immediate(instruction)) begin
 					state <= STATE_RETRIEVE;
 				end else state <= STATE_EXECUTE;
 			end
@@ -137,6 +162,8 @@ module cpu(
 					end else begin
 						state <= STATE_EXECUTE;
 						memory_read_en_r <= 0;
+						needed_operands <= operands_for_instr(instruction, instr_imm);
+						ready_operands <= 0;
 					end
 
 				end else begin
@@ -145,8 +172,24 @@ module cpu(
 				end
 			end
 			STATE_EXECUTE: begin
-				state <= STATE_FETCH;
-				handle_instruction();
+				if (exec_done) begin
+					state <= STATE_FETCH;
+					instruction <= 0;
+				end else begin
+					if (ready_operands == needed_operands) begin
+						memory_read_en_r <= 0;
+						handle_instruction();
+					end else begin
+						memory_read_en_r <= 1;
+						if (memory_ready) begin
+							_operand[needed_operands-ready_operands] <= data_out;
+							ready_operands <= ready_operands + 1; 
+							addr_r <= op_stack_top - (ready_operands+1);
+						end else begin
+							addr_r <= op_stack_top - ready_operands;
+						end
+					end
+				end
 			end
 		endcase
 	end

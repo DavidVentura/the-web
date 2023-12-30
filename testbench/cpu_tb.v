@@ -14,20 +14,6 @@ module memory(
 	assign ready = ready_r;
 	assign data_out = data_out_r;
 	
-	wire [7:0] mem0;
-	wire [15:8] mem1;
-	wire [23:16] mem2;
-	wire [31:24] mem3;
-	wire [39:32] mem4;
-	wire [47:40] mem5;
-
-	assign mem0 = mem[0];
-	assign mem1 = mem[8];
-	assign mem2 = mem[16];
-	assign mem3 = mem[24];
-	assign mem4 = mem[32];
-	assign mem5 = mem[40];
-
 	initial begin
 	  $readmemb("output.txt", mem);
 	end
