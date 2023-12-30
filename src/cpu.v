@@ -7,6 +7,9 @@ module cpu(
 	output memory_write_en,
 	input memory_ready
 );
+
+    localparam CODE_BASE = 8'h30;
+
 	reg [3:0]  state = 0;
 	reg [31:0] pc = 8'h1A;
 	reg [7:0]  instruction = 0;
@@ -15,6 +18,7 @@ module cpu(
 	reg [7:0]  needed_operands = 0;
 	reg [7:0]  ready_operands = 0;
 	reg [63:0] _operand [1:0];
+	reg [31:0] code_at = 32'haaaaaaaa;
 
 	reg exec_done = 0;
 
@@ -36,18 +40,20 @@ module cpu(
 	assign memory_read_en = memory_read_en_r;
 	assign memory_write_en = memory_write_en_r;
 
-	localparam STATE_FETCH 					= 0;
-	localparam STATE_FETCH_WAIT_START 		= 1;
-	localparam STATE_FETCH_WAIT_DONE 		= 2;
-	localparam STATE_DECODE 				= 3;
-	localparam STATE_RETRIEVE 				= 4;
-	localparam STATE_RETRIEVE_WAIT_START 	= 5;
-	localparam STATE_RETRIEVE_WAIT_DONE 	= 6;
+	localparam STATE_BOOTSTRAP 				= 0;
+	localparam STATE_BOOTSTRAP_DONE			= 1;
+	localparam STATE_FETCH 					= 2;
+	localparam STATE_FETCH_WAIT_START 		= 3;
+	localparam STATE_FETCH_WAIT_DONE 		= 4;
+	localparam STATE_DECODE 				= 5;
+	localparam STATE_RETRIEVE 				= 6;
+	localparam STATE_RETRIEVE_WAIT_START 	= 7;
+	localparam STATE_RETRIEVE_WAIT_DONE 	= 8;
 	// load_r1
 	// load_r2
-	localparam STATE_EXECUTE 				= 7;
+	localparam STATE_EXECUTE 				= 9;
 	// store result
-	localparam STATE_HALT 					= 8;
+	localparam STATE_HALT 					= 10;
 
 	localparam I32_CONST 	= 8'H41;
 	localparam CALL 		= 8'H10;
@@ -129,6 +135,26 @@ module cpu(
 		end
 	endtask
 
+	always @(posedge clk) begin
+		case(state)
+			STATE_BOOTSTRAP: begin
+				if (memory_ready) begin
+					code_at <= data_out;
+					memory_read_en_r <= 0;
+					state <= STATE_BOOTSTRAP_DONE;
+				end else begin
+					addr_r <= CODE_BASE;
+					memory_read_en_r <= 1;
+				end
+			end
+			STATE_BOOTSTRAP_DONE: begin
+				if(!memory_ready) begin
+					state <= STATE_FETCH;
+				end
+			end
+		endcase
+	end
+
 	reg [3:0] _cur_retr_byte = 0;
 	always @(posedge clk) begin
 		case(state)
@@ -140,7 +166,7 @@ module cpu(
 					pc <= pc + 1;
 					instr_imm <= 0;
 				end else begin
-					addr_r <= pc;
+					addr_r <= pc + code_at;
 					memory_read_en_r <= 1;
 					exec_done <= 0;
 				end
@@ -167,7 +193,7 @@ module cpu(
 					end
 
 				end else begin
-					addr_r <= pc;
+					addr_r <= pc + code_at;
 					memory_read_en_r <= 1;
 				end
 			end
