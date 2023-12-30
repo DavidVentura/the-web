@@ -1,0 +1,5 @@
+*.vcd
+*.wasm
+__pycache__
+a.out
+output.txt
