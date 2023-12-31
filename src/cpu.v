@@ -1,17 +1,21 @@
 module cpu(
     input clk,
+	// mem
 	output [31:0] addr,
 	output [7:0] data_in,
 	input  [7:0] data_out,
 	output memory_read_en,
 	output memory_write_en,
-	input memory_ready
+	input memory_ready,
+
+	// wasm parser
+	input  rom_mapped,
+	input  [31:0] first_instruction
 );
 
-    localparam CODE_BASE = 8'h30;
 
 	reg [3:0]  state = 0;
-	reg [31:0] pc = 8'h1A;
+	reg [31:0] pc = 8'hzz;
 	reg [7:0]  instruction = 0;
 	reg [63:0] instr_imm = 0;
 	reg [63:0] registers [31:0];
@@ -46,16 +50,17 @@ module cpu(
 	assign memory_write_en = memory_write_en_r;
 
 	localparam STATE_BOOTSTRAP 				= 0;
-	localparam STATE_BOOTSTRAP_DONE			= 1;
-	localparam STATE_FETCH 					= 2;
-	localparam STATE_FETCH_WAIT_START 		= 3;
-	localparam STATE_FETCH_WAIT_DONE 		= 4;
-	localparam STATE_DECODE 				= 5;
-	localparam STATE_RETRIEVE 				= 6;
-	localparam STATE_LOAD_REG 				= 7;
-	localparam STATE_CALC_OPERANDS 			= 8;
-	localparam STATE_EXECUTE 				= 9;
-	localparam STATE_HALT 					= 10;
+	localparam STATE_PARSING_ROM    		= 1;
+	localparam STATE_BOOTSTRAP_DONE			= 2;
+	localparam STATE_FETCH 					= 3;
+	localparam STATE_FETCH_WAIT_START 		= 4;
+	localparam STATE_FETCH_WAIT_DONE 		= 5;
+	localparam STATE_DECODE 				= 6;
+	localparam STATE_RETRIEVE 				= 7;
+	localparam STATE_LOAD_REG 				= 8;
+	localparam STATE_CALC_OPERANDS 			= 9;
+	localparam STATE_EXECUTE 				= 10;
+	localparam STATE_HALT 					= 11;
 
 	localparam I32_CONST 	= 8'h41;
 	localparam CALL 		= 8'h10;
@@ -148,13 +153,10 @@ module cpu(
 	always @(posedge clk) begin
 		case(state)
 			STATE_BOOTSTRAP: begin
-				if (memory_ready) begin
-					code_at <= data_out;
+				if (rom_mapped) begin
 					memory_read_en_r <= 0;
 					state <= STATE_BOOTSTRAP_DONE;
-				end else begin
-					addr_r <= CODE_BASE;
-					memory_read_en_r <= 1;
+					pc <= first_instruction;
 				end
 			end
 			STATE_BOOTSTRAP_DONE: begin
