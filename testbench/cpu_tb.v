@@ -7,8 +7,11 @@ module memory(
 	input memory_write_en,
 	output ready
 );
-	reg [7:0] mem [0:99];
+	// TODO: this caps out at 255
+	reg [7:0] mem [0:255];
 	reg [7:0] data_out_r;
+
+	reg [31:0] last_addr = 0;
 
 	reg ready_r = 0;
 	assign ready = ready_r;
@@ -19,13 +22,17 @@ module memory(
 	end
 
 	always @(posedge clk) begin
-		if (memory_read_en) begin
-			data_out_r <= mem[addr];
+		if (memory_read_en && addr !== last_addr) begin
+			$display("Read  %x from %x", mem[addr & 8'hff], addr);
+			data_out_r <= mem[addr & 8'hff];
+			last_addr <= addr;
 			ready_r <= 1;
 		end else begin
 			ready_r <= 0;
 			if (memory_write_en) begin
-				mem[addr] <= data_in;
+				last_addr <= 1'bx;
+				$display("Wrote %x to   %x", data_in, addr);
+				mem[addr & 8'hff] <= data_in;
 			end
 		end
 	end
@@ -55,11 +62,13 @@ module cpu_tb;
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
 	  #100;
-	  mem_addr_r <= 8'hAA;
+	  mem_addr_r <= 8'hAB;
 	  memory_read_en_r <= 1;
 	  #1; 
 	  @(posedge mem_ready);
-	  $display("Stack TOP reset? %x", mem_data_out);
+	  if (mem_data_out !== 8'h1E) begin
+		  $display("ERROR, expected 0x1e, got 0x%X", mem_data_out);
+	  end else $display("[OK] expected 0x1e, got 0x%X", mem_data_out);
 	  #10;
 	  $finish;
 	end

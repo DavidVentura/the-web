@@ -29,6 +29,8 @@ module cpu(
 	wire [7:0] _call_stack_top;
 	assign _op_stack_top = op_stack_top;
 	assign _call_stack_top = call_stack_top;
+	wire [63:0] operand1 = _operand[0];
+	wire [63:0] operand2 = _operand[1];
 
 	reg halted = 0;
 	// /DEBUG
@@ -50,12 +52,9 @@ module cpu(
 	localparam STATE_FETCH_WAIT_DONE 		= 4;
 	localparam STATE_DECODE 				= 5;
 	localparam STATE_RETRIEVE 				= 6;
-	localparam STATE_RETRIEVE_WAIT_START 	= 7;
-	localparam STATE_RETRIEVE_WAIT_DONE 	= 8;
-	// load_r1
-	// load_r2
+	localparam STATE_LOAD_REG 				= 7;
+	localparam STATE_CALC_OPERANDS 			= 8;
 	localparam STATE_EXECUTE 				= 9;
-	// store result
 	localparam STATE_HALT 					= 10;
 
 	localparam I32_CONST 	= 8'h41;
@@ -85,17 +84,21 @@ module cpu(
 		end
 	endfunction
 
-	function operands_for_instr(input [7:0] inst, input[63:0] imm);
+	function [2:0] operands_for_instr(input [7:0] inst);
 		begin
 			case(inst)
-				END_OF_FUNC, LOCAL_SET: begin
+				END_OF_FUNC, LOCAL_SET, I32_CONST, UNREACHABLE: begin
 					operands_for_instr = 0;
 				end
-				I32_CONST, DROP, LOCAL_SET: begin
+				DROP, LOCAL_SET: begin
 					operands_for_instr = 1;
 				end
 				I32_ADD, I32_MUL: begin
 					operands_for_instr = 2;
+				end
+				default: begin
+					$display("No idea how many operands for %x", inst);
+					$finish;
 				end
 			endcase
 		end
@@ -114,7 +117,7 @@ module cpu(
 					data_in_r <= instr_imm;
 				end
 				I32_ADD: begin
-					addr_r <= op_stack_top;
+					addr_r <= op_stack_top - 1;
 					memory_write_en_r <= 1;
 					data_in_r <= _operand[0] + _operand[1];
 					op_stack_top <= op_stack_top - 1;
@@ -181,7 +184,14 @@ module cpu(
 			STATE_DECODE: begin
 				if (needs_immediate(instruction)) begin
 					state <= STATE_RETRIEVE;
-				end else state <= STATE_EXECUTE;
+				end else begin
+					// CALL can't fall into this branch as it requires
+					// an immediate
+					ready_operands <= 0;
+					state <= STATE_LOAD_REG;
+					memory_read_en_r <= 0;
+					needed_operands <= operands_for_instr(instruction);
+				end
 			end
 			STATE_RETRIEVE: begin
 				if (memory_ready) begin
@@ -191,17 +201,40 @@ module cpu(
 
 					// If highest bit present, continue
 					if ((data_out & 8'h80) == 8'h80) begin
-						_cur_retr_byte = _cur_retr_byte + 1;
+						_cur_retr_byte <= _cur_retr_byte + 1;
 					end else begin
-						state <= STATE_EXECUTE;
 						memory_read_en_r <= 0;
-						needed_operands <= operands_for_instr(instruction, instr_imm);
 						ready_operands <= 0;
+						state <= instruction == CALL ? STATE_CALC_OPERANDS : STATE_LOAD_REG;
 					end
-
 				end else begin
 					addr_r <= pc + code_at;
 					memory_read_en_r <= 1;
+				end
+			end
+			STATE_CALC_OPERANDS: begin
+				// CALL requires $instr_imm operands
+				needed_operands <= instr_imm;
+				state <= STATE_LOAD_REG;
+				memory_read_en_r <= 0;
+			end
+			STATE_LOAD_REG: begin
+				if(needed_operands == 0) begin
+					state <= STATE_EXECUTE;
+					memory_read_en_r <= 0;
+				end else begin
+					if (memory_ready) begin
+						_operand[needed_operands-ready_operands-1] <= data_out;
+						ready_operands <= ready_operands + 1; 
+						addr_r <= op_stack_top - (ready_operands+1) - 1;
+						if ((ready_operands + 1) == needed_operands) begin
+							memory_read_en_r <= 0;
+							state <= STATE_EXECUTE;
+						end
+					end else begin
+						addr_r <= op_stack_top - ready_operands - 1;
+						memory_read_en_r <= 1;
+					end
 				end
 			end
 			STATE_EXECUTE: begin
@@ -209,19 +242,7 @@ module cpu(
 					state <= STATE_FETCH;
 					instruction <= 0;
 				end else begin
-					if (ready_operands == needed_operands) begin
-						memory_read_en_r <= 0;
-						handle_instruction();
-					end else begin
-						memory_read_en_r <= 1;
-						if (memory_ready) begin
-							_operand[needed_operands-ready_operands] <= data_out;
-							ready_operands <= ready_operands + 1; 
-							addr_r <= op_stack_top - (ready_operands+1);
-						end else begin
-							addr_r <= op_stack_top - ready_operands;
-						end
-					end
+					handle_instruction();
 				end
 			end
 			STATE_HALT: begin
