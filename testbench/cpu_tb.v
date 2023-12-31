@@ -41,6 +41,12 @@ module cpu_tb;
 	wire memory_write_en;
 	wire mem_ready;
 
+	reg [31:0] mem_addr_r = 32'bz;
+	reg memory_read_en_r = 1'bz;
+
+	assign memory_read_en = memory_read_en_r;
+	assign mem_addr = mem_addr_r;
+
 	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 
@@ -48,7 +54,14 @@ module cpu_tb;
 	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
-	  #100 $finish;
+	  #100;
+	  mem_addr_r <= 8'hAA;
+	  memory_read_en_r <= 1;
+	  #1; 
+	  @(posedge mem_ready);
+	  $display("Stack TOP reset? %x", mem_data_out);
+	  #10;
+	  $finish;
 	end
 
 endmodule
