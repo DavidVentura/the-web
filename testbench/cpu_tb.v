@@ -16,9 +16,16 @@ module memory(
 	reg ready_r = 0;
 	assign ready = ready_r;
 	assign data_out = data_out_r;
+	reg [127:0] testname;
 	
 	initial begin
-	  $readmemb("output.txt", mem);
+		if ($value$plusargs("TESTNAME=%s", testname)) begin
+			$display("Running test %s", testname);
+			$readmemb(testname, mem);
+		end else begin
+			$display("Need +TESTNAME=mem.txt");
+			$finish;
+		end
 	end
 
 	always @(posedge clk) begin
