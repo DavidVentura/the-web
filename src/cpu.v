@@ -39,9 +39,9 @@ module cpu(
 	reg halted = 0;
 	// /DEBUG
 
-	reg [31:0] addr_r;
+	reg [31:0] addr_r = 32'bz;
 	reg [7:0] data_in_r = 0;
-	reg memory_read_en_r = 0;
+	reg memory_read_en_r = 1'bz;
 	reg memory_write_en_r = 0;
 
 	assign addr = addr_r;
