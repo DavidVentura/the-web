@@ -72,6 +72,15 @@ assign rom_read_en = rom_read_en_r;
 reg [31:0] rom_addr_r = 32'bz;
 assign rom_addr = rom_addr_r;
 
+// interface to mem
+reg mem_write_en_r = 1'bz;
+assign mem_write_en = mem_write_en_r;
+reg [31:0] mem_addr_r = 32'bz;
+assign mem_addr = mem_addr_r;
+reg [31:0] mem_data_in_r = 32'bz;
+assign mem_data_in = mem_data_in_r;
+
+// result
 reg rom_mapped_r = 0;
 assign rom_mapped = rom_mapped_r;
 
@@ -146,6 +155,9 @@ always @(posedge clk) begin
 			end
 		end
 		S_HALT: begin
+			mem_write_en_r <= 1'bz;
+			mem_addr_r <= 32'bz;
+			mem_data_in_r <= 8'bz;
 		end
 	endcase
 end
@@ -230,7 +242,7 @@ always @(posedge clk) begin
 				   2.b. Read 1 LEB for type of the locals
 				 3. Read $length (1.) bytes of code
 			 */
-			if (leb_done || substate == READ_CODE) begin // ugh
+			if (leb_done || (substate == READ_CODE)) begin // ugh
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
@@ -274,23 +286,29 @@ always @(posedge clk) begin
 
 						if((read_func == pc_func_id) && first_instruction_r == 0) begin
 							$display("Code for start at %x", current_b);
-							first_instruction_r <= current_b;
+							first_instruction_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
 						end
-						if (current_b == (func_len + func_start_at)) begin
-							substate <= FINISH_FUNC;
-							rom_read_en_r <= 0;
+
+						if(!rom_ready) begin
+							rom_read_en_r <= 1;
+							rom_addr_r <= current_b;
 						end else begin
-							if(!rom_ready) begin
-								rom_read_en_r <= 1;
-								rom_addr_r <= current_b;
-							end else begin
-								$display("Found code byte %x", rom_data_out);
-								current_b <= current_b + 1;
+							current_b <= current_b + 1;
+							rom_addr_r <= current_b + 1;
+							mem_write_en_r <= 1;
+							mem_addr_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
+							mem_data_in_r <= rom_data_out & 8'hFF; // FIXME byte?
+
+							if (current_b == (func_len + func_start_at + 1)) begin
+								substate <= FINISH_FUNC;
 								rom_read_en_r <= 0;
+							end else begin
+								rom_read_en_r <= 1;
 							end
 						end
 					end
 					FINISH_FUNC: begin
+						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
 						if ((read_func + 1) < func_count) begin
 							substate <= READ_FUNC_LEN;

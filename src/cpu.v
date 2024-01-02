@@ -22,7 +22,6 @@ module cpu(
 	reg [7:0]  needed_operands = 0;
 	reg [7:0]  ready_operands = 0;
 	reg [63:0] _operand [1:0];
-	reg [31:0] code_at = 32'haaaaaaaa;
 
 	reg exec_done = 0;
 
@@ -40,9 +39,9 @@ module cpu(
 	// /DEBUG
 
 	reg [31:0] addr_r = 32'bz;
-	reg [7:0] data_in_r = 0;
+	reg [7:0] data_in_r = 32'bz;
 	reg memory_read_en_r = 1'bz;
-	reg memory_write_en_r = 0;
+	reg memory_write_en_r = 1'bz;
 
 	assign addr = addr_r;
 	assign data_in = data_in_r;
@@ -178,7 +177,7 @@ module cpu(
 					pc <= pc + 1;
 					instr_imm <= 0;
 				end else begin
-					addr_r <= pc + code_at;
+					addr_r <= pc;
 					memory_read_en_r <= 1;
 					exec_done <= 0;
 				end
@@ -210,7 +209,7 @@ module cpu(
 						state <= instruction == CALL ? STATE_CALC_OPERANDS : STATE_LOAD_REG;
 					end
 				end else begin
-					addr_r <= pc + code_at;
+					addr_r <= pc;
 					memory_read_en_r <= 1;
 				end
 			end

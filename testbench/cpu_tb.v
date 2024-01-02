@@ -2,7 +2,7 @@ module rom(
 	input clk,
 	input [31:0] addr,
 	output [7:0] data_out,
-	input memory_read_en,
+	input read_en,
 	output ready
 );
 	// TODO: this caps out at 255
@@ -27,7 +27,7 @@ module rom(
 	end
 
 	always @(posedge clk) begin
-		if (memory_read_en && addr !== last_addr) begin
+		if (read_en && addr !== last_addr) begin
 			$display("[ROM] Read  %x from %x", mem[addr & 8'hff], addr);
 			data_out_r <= mem[addr & 8'hff];
 			last_addr <= addr;
@@ -76,6 +76,7 @@ endmodule
 module cpu_tb;
 	reg clk = 0;
 	always #1 clk <= ~clk;
+	wire [31:0] mem_addr2;
 	wire [31:0] mem_addr;
 	wire [7:0] mem_data_in;
 	wire [7:0] mem_data_out;
@@ -94,32 +95,34 @@ module cpu_tb;
 	reg [31:0] mem_addr_r = 32'bz;
 	reg memory_read_en_r = 1'bz;
 
-	//assign memory_read_en = memory_read_en_r;
-	//assign mem_addr = mem_addr_r;
+	assign memory_read_en = memory_read_en_r;
+	assign mem_addr = mem_addr_r;
 
-	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
+	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
 	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
 
 	integer fd;
 	initial begin
+		#400 $finish;
+	end
+	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
 
 	  @(posedge rom_mapped);
 	  #10;
-	  if (first_instruction != 8'h5A) begin // 0x40 + 0x1A
-		  $display("ERROR: Expected first instr at 0x5A, got 0x%X", first_instruction);
-	  end else $display("OK: Expected first instr at 0x5A, got 0x%X", first_instruction);
+	  // Per BOOT.md
+
+	  $display("[%s]: Expected first instr at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
+
+	  #80;
+
 	  mem_addr_r <= 8'hAB;
 	  memory_read_en_r <= 1;
-	  #1; 
-	  $finish;
 	  @(posedge mem_ready);
-	  if (mem_data_out !== 8'h1E) begin
-		  $display("ERROR, expected 0x1e, got 0x%X", mem_data_out);
-	  end else $display("[OK] expected 0x1e, got 0x%X", mem_data_out);
+	  $display("[%s] expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
 	  #10;
 	  $finish;
 	end
