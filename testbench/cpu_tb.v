@@ -55,23 +55,33 @@ module cpu_tb;
 	wire memory_write_en;
 	wire mem_ready;
 
+	wire rom_mapped;
+	wire [31:0] first_instruction;
+
 	reg [31:0] mem_addr_r = 32'bz;
 	reg memory_read_en_r = 1'bz;
 
-	assign memory_read_en = memory_read_en_r;
-	assign mem_addr = mem_addr_r;
+	//assign memory_read_en = memory_read_en_r;
+	//assign mem_addr = mem_addr_r;
 
 	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
+	wasm w(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
 
 	integer fd;
 	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
-	  #100;
+
+	  @(posedge rom_mapped);
+	  #10;
+	  if (first_instruction != 8'h5A) begin // 0x40 + 0x1A
+		  $display("ERROR: Expected first instr at 0x5A, got 0x%X", first_instruction);
+	  end else $display("OK: Expected first instr at 0x5A, got 0x%X", first_instruction);
 	  mem_addr_r <= 8'hAB;
 	  memory_read_en_r <= 1;
 	  #1; 
+	  $finish;
 	  @(posedge mem_ready);
 	  if (mem_data_out !== 8'h1E) begin
 		  $display("ERROR, expected 0x1e, got 0x%X", mem_data_out);
