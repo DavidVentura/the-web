@@ -1,12 +1,14 @@
 module wasm(
     input clk,
+	// rom
+	output [31:0] rom_addr,
+	input  [7:0] rom_data_out,
+	output rom_read_en,
+	input rom_ready,
 	// mem
-	output [31:0] addr,
-	output [7:0] data_in,
-	input  [7:0] data_out,
-	output memory_read_en,
-	output memory_write_en,
-	input memory_ready,
+	output [31:0] mem_addr,
+	output [7:0] mem_data_in,
+	output mem_write_en,
 
 	// module output
 	output rom_mapped,
@@ -65,10 +67,10 @@ reg [31:0] first_instruction_r = 0;
 assign first_instruction = first_instruction_r;
 
 // interface to module
-reg memory_read_en_r = 1'bz;
-assign memory_read_en = memory_read_en_r;
-reg [31:0] addr_r = 32'bz;
-assign addr = addr_r;
+reg rom_read_en_r = 1'bz;
+assign rom_read_en = rom_read_en_r;
+reg [31:0] rom_addr_r = 32'bz;
+assign rom_addr = rom_addr_r;
 
 reg rom_mapped_r = 0;
 assign rom_mapped = rom_mapped_r;
@@ -81,18 +83,18 @@ reg [7:0] pc_func_id = 1'bz;
 always @(posedge clk) begin
 	case(state)
 		S_STARTUP: begin
-			if (memory_ready) begin
-				wasm_base <= data_out;
-				current_b <= data_out;
-				memory_read_en_r <= 0;
+			if (rom_ready) begin
+				wasm_base <= rom_data_out;
+				current_b <= rom_data_out;
+				rom_read_en_r <= 0;
 				state <= S_READ_WASM_MAGIC;
 			end else begin
-				addr_r <= CODE_BASE;
-				memory_read_en_r <= 1;
+				rom_addr_r <= CODE_BASE;
+				rom_read_en_r <= 1;
 			end
 		end
 		S_READ_WASM_MAGIC: begin
-			if (memory_ready) begin
+			if (rom_ready) begin
 				current_b <= current_b + 1;
 				sec_idx <= sec_idx + 1;
 				if ((sec_idx+1) == 8) begin
@@ -100,32 +102,32 @@ always @(posedge clk) begin
 					sec_idx <= 0;
 				end
 			end else begin
-				addr_r <= current_b;
-				memory_read_en_r <= 1;
+				rom_addr_r <= current_b;
+				rom_read_en_r <= 1;
 			end
 		end
 		S_PRE_READ_SECTION: begin
 			state <= S_READ_SECTION;
-			memory_read_en_r <= 0;
+			rom_read_en_r <= 0;
 			sec_idx <= 0;
 			_leb_byte <= 0;
 			section_len <= 0;
 			_leb128 <= 0;
 		end
 		S_READ_SECTION: begin
-			if (memory_ready) begin
+			if (rom_ready) begin
 				current_b <= current_b + 1;
 				sec_idx <= sec_idx + 1;
 				if (sec_idx == 0) begin
-					next_section <= data_out;
+					next_section <= rom_data_out;
 				end else begin
-					_leb128 <= _leb128 | ((data_out & 8'h7F) << (7 * _leb_byte));
-					if ((data_out & 8'h80) != 8'h80) begin
+					_leb128 <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
+					if ((rom_data_out & 8'h80) != 8'h80) begin
 						$display("Finished reading section %x len %x",
 								 next_section,
-								 _leb128 | ((data_out & 8'h7F) << (7 * _leb_byte)));
-						memory_read_en_r <= 0;
-						section_len <= _leb128 | ((data_out & 8'h7F) << (7 * _leb_byte));
+								 _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte)));
+						rom_read_en_r <= 0;
+						section_len <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 						section <= next_section;
 						if(next_section == SECTION_CODE) begin
 							substate <= READ_FUNC_COUNT;
@@ -139,8 +141,8 @@ always @(posedge clk) begin
 					end
 				end
 			end else begin
-				addr_r <= current_b;
-				memory_read_en_r <= 1;
+				rom_addr_r <= current_b;
+				rom_read_en_r <= 1;
 			end
 		end
 		S_HALT: begin
@@ -156,16 +158,16 @@ always @(posedge clk) begin
 end
 task read_leb128();
 	begin
-		if (memory_ready) begin
-			_leb128 <= _leb128 | ((data_out & 8'h7F) << (7 * _leb_byte));
+		if (rom_ready) begin
+			_leb128 <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 			current_b <= current_b + 1;
-			if ((data_out & 8'h80) != 8'h80) begin
+			if ((rom_data_out & 8'h80) != 8'h80) begin
 				leb_done <= 1;
-				memory_read_en_r <= 0;
+				rom_read_en_r <= 0;
 			end
 		end else begin
-			addr_r <= current_b;
-			memory_read_en_r <= 1;
+			rom_addr_r <= current_b;
+			rom_read_en_r <= 1;
 		end
 	end
 endtask
@@ -174,9 +176,9 @@ always @(posedge clk) begin
 	case(section)
 		SECTION_TYPE: begin
 			// TODO: Store type info ??
-			if (memory_ready) begin
+			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Type at %x read %x", sec_idx, data_out);
+				$display("In Type at %x read %x", sec_idx, rom_data_out);
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -184,14 +186,14 @@ always @(posedge clk) begin
 					sec_idx <= sec_idx + 1;
 				end
 			end else begin
-				addr_r <= current_b;
-				memory_read_en_r <= 1;
+				rom_addr_r <= current_b;
+				rom_read_en_r <= 1;
 			end
 		end
 		SECTION_FUNCTION: begin
-			if (memory_ready) begin
+			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Function at %x read %x", sec_idx, data_out);
+				$display("In Function at %x read %x", sec_idx, rom_data_out);
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -199,16 +201,16 @@ always @(posedge clk) begin
 					sec_idx <= sec_idx + 1;
 				end
 			end else begin
-				addr_r <= current_b;
-				memory_read_en_r <= 1;
+				rom_addr_r <= current_b;
+				rom_read_en_r <= 1;
 			end
 		end
 		SECTION_START: begin
-			if (memory_ready) begin
+			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Start at %x read %x", sec_idx, data_out);
+				$display("In Start at %x read %x", sec_idx, rom_data_out);
 				// TODO: Read a LEB128
-				pc_func_id <= data_out;
+				pc_func_id <= rom_data_out;
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -216,8 +218,8 @@ always @(posedge clk) begin
 					sec_idx <= sec_idx + 1;
 				end
 			end else begin
-				addr_r <= current_b;
-				memory_read_en_r <= 1;
+				rom_addr_r <= current_b;
+				rom_read_en_r <= 1;
 			end
 		end
 		SECTION_CODE: begin
@@ -239,7 +241,7 @@ always @(posedge clk) begin
 					// vv Repeat #func_count
 					READ_FUNC_LEN: begin
 						func_len <= _leb128;
-						func_start_at <= addr_r;
+						func_start_at <= rom_addr_r;
 						substate <= READ_BLOCK_COUNT;
 					end
 					READ_BLOCK_COUNT: begin
@@ -276,15 +278,15 @@ always @(posedge clk) begin
 						end
 						if (current_b == (func_len + func_start_at)) begin
 							substate <= FINISH_FUNC;
-							memory_read_en_r <= 0;
+							rom_read_en_r <= 0;
 						end else begin
-							if(!memory_ready) begin
-								memory_read_en_r <= 1;
-								addr_r <= current_b;
+							if(!rom_ready) begin
+								rom_read_en_r <= 1;
+								rom_addr_r <= current_b;
 							end else begin
-								$display("Found code byte %x", data_out);
+								$display("Found code byte %x", rom_data_out);
 								current_b <= current_b + 1;
-								memory_read_en_r <= 0;
+								rom_read_en_r <= 0;
 							end
 						end
 					end

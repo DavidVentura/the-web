@@ -1,10 +1,8 @@
-module memory(
+module rom(
 	input clk,
 	input [31:0] addr,
-	input [7:0] data_in,
 	output [7:0] data_out,
 	input memory_read_en,
-	input memory_write_en,
 	output ready
 );
 	// TODO: this caps out at 255
@@ -30,7 +28,37 @@ module memory(
 
 	always @(posedge clk) begin
 		if (memory_read_en && addr !== last_addr) begin
-			$display("Read  %x from %x", mem[addr & 8'hff], addr);
+			$display("[ROM] Read  %x from %x", mem[addr & 8'hff], addr);
+			data_out_r <= mem[addr & 8'hff];
+			last_addr <= addr;
+			ready_r <= 1;
+		end else begin
+			ready_r <= 0;
+		end
+	end
+endmodule
+module memory(
+	input clk,
+	input [31:0] addr,
+	input [7:0] data_in,
+	output [7:0] data_out,
+	input memory_read_en,
+	input memory_write_en,
+	output ready
+);
+	// TODO: this caps out at 255
+	reg [7:0] mem [0:255];
+	reg [7:0] data_out_r;
+
+	reg [31:0] last_addr = 0;
+
+	reg ready_r = 0;
+	assign ready = ready_r;
+	assign data_out = data_out_r;
+
+	always @(posedge clk) begin
+		if (memory_read_en && addr !== last_addr) begin
+			$display("[MEM] Read  %x from %x", mem[addr & 8'hff], addr);
 			data_out_r <= mem[addr & 8'hff];
 			last_addr <= addr;
 			ready_r <= 1;
@@ -38,7 +66,7 @@ module memory(
 			ready_r <= 0;
 			if (memory_write_en) begin
 				last_addr <= 1'bx;
-				$display("Wrote %x to   %x", data_in, addr);
+				$display("[MEM] Wrote %x to   %x", data_in, addr);
 				mem[addr & 8'hff] <= data_in;
 			end
 		end
@@ -55,6 +83,11 @@ module cpu_tb;
 	wire memory_write_en;
 	wire mem_ready;
 
+	wire [31:0] rom_addr;
+	wire [7:0] rom_data_out;
+	wire rom_read_en;
+	wire rom_ready;
+
 	wire rom_mapped;
 	wire [31:0] first_instruction;
 
@@ -66,7 +99,8 @@ module cpu_tb;
 
 	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
-	wasm w(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
+	rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
+	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
 
 	integer fd;
 	initial begin
