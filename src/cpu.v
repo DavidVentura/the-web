@@ -102,7 +102,7 @@ module cpu(
 				end
 				default: begin
 					$display("No idea how many operands for %x", inst);
-					$finish;
+					//$finish;
 				end
 			endcase
 		end
@@ -115,24 +115,28 @@ module cpu(
 		begin
 			case(instruction)
 				I32_CONST: begin
+					$display("[E] i32.const %x", instr_imm);
 					op_stack_top <= op_stack_top + 1;
 					addr_r <= op_stack_top;
 					memory_write_en_r <= 1;
 					data_in_r <= instr_imm;
 				end
 				I32_ADD: begin
+					$display("[E] i32.add %x %x", _operand[0], _operand[1]);
 					addr_r <= op_stack_top - 1;
 					memory_write_en_r <= 1;
 					data_in_r <= _operand[0] + _operand[1];
 					op_stack_top <= op_stack_top - 1;
 				end
 				CALL: begin
+					$display("[E] call %x", instr_imm);
 					addr_r <= call_stack_top;
 					call_stack_top <= call_stack_top + 1;
 					memory_write_en_r <= 1;
 					data_in_r <= pc;
 				end
 				DROP: begin
+					$display("[E] call %x", instr_imm);
 					op_stack_top <= op_stack_top - 1;
 				end
 				END_OF_FUNC: begin
@@ -153,6 +157,7 @@ module cpu(
 		case(state)
 			STATE_BOOTSTRAP: begin
 				if (rom_mapped) begin
+					$display("[CPU] starting");
 					memory_read_en_r <= 0;
 					state <= STATE_BOOTSTRAP_DONE;
 					pc <= first_instruction;

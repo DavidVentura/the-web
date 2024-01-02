@@ -37,6 +37,9 @@ localparam READ_LOCAL_TYPE  = 4;
 localparam READ_CODE  		= 5;
 localparam FINISH_FUNC 		= 6;
 
+// Platform constants
+localparam CODE_BASE = 8'h30; // Per BOOT.md
+
 // CODE section regs
 reg [7:0] func_count = 1'bz;
 reg [7:0] curr_func = 1'bz;
@@ -47,11 +50,10 @@ reg [7:0] local_count = 1'bz;
 reg [7:0] local_type = 1'bz;
 reg [7:0] read_local_blocks = 1'bz;
 reg [7:0] read_func = 1'bz;
+reg [31:0] code_block_base = CODE_BASE;
 
 // LEB
 reg leb_done = 0;
-
-localparam CODE_BASE = 8'h30; // Per BOOT.md
 
 reg [4:0] state = S_STARTUP;
 reg [4:0] substate = 1'bz;
@@ -132,7 +134,7 @@ always @(posedge clk) begin
 				end else begin
 					_leb128 <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 					if ((rom_data_out & 8'h80) != 8'h80) begin
-						$display("Finished reading section %x len %x",
+						$display("[BR] Section %x: len %x",
 								 next_section,
 								 _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte)));
 						rom_read_en_r <= 0;
@@ -190,7 +192,6 @@ always @(posedge clk) begin
 			// TODO: Store type info ??
 			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Type at %x read %x", sec_idx, rom_data_out);
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -205,7 +206,6 @@ always @(posedge clk) begin
 		SECTION_FUNCTION: begin
 			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Function at %x read %x", sec_idx, rom_data_out);
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -220,7 +220,6 @@ always @(posedge clk) begin
 		SECTION_START: begin
 			if (rom_ready) begin
 				current_b <= current_b + 1;
-				$display("In Start at %x read %x", sec_idx, rom_data_out);
 				// TODO: Read a LEB128
 				pc_func_id <= rom_data_out;
 				if ((sec_idx + 1) == section_len) begin
@@ -285,7 +284,6 @@ always @(posedge clk) begin
 						// 	  - imported (1 bit, always 0)
 
 						if((read_func == pc_func_id) && first_instruction_r == 0) begin
-							$display("Code for start at %x", current_b);
 							first_instruction_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
 						end
 
@@ -296,12 +294,13 @@ always @(posedge clk) begin
 							current_b <= current_b + 1;
 							rom_addr_r <= current_b + 1;
 							mem_write_en_r <= 1;
-							mem_addr_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
+							mem_addr_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 							mem_data_in_r <= rom_data_out & 8'hFF; // FIXME byte?
 
 							if (current_b == (func_len + func_start_at + 1)) begin
 								substate <= FINISH_FUNC;
 								rom_read_en_r <= 0;
+								code_block_base <= code_block_base + (func_len & 32'hfffffff0) + 16'h10;
 							end else begin
 								rom_read_en_r <= 1;
 							end
@@ -310,11 +309,13 @@ always @(posedge clk) begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
+						$display("Next func starts at %x", code_block_base);
 						if ((read_func + 1) < func_count) begin
 							substate <= READ_FUNC_LEN;
 						end else begin
 							state <= S_HALT;
 							section <= SECTION_HALT;
+							$display("Finished reading BOOTROM, pc: %x", first_instruction_r);
 							rom_mapped_r <= 1;
 						end
 					end

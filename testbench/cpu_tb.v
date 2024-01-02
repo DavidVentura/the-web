@@ -115,7 +115,7 @@ module cpu_tb;
 	  #10;
 	  // Per BOOT.md
 
-	  $display("[%s]: Expected first instr at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
+	  $display("[%s]: Expected first FTE at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
 
 	  #80;
 
