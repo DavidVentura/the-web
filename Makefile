@@ -37,7 +37,7 @@ test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_
 	./a.out +TESTNAME=mem_01_adder.txt
 
 web.json: src/cpu.v src/wasm.v src/memory.v src/control.v
-	yosys -p "read_verilog $^; synth_gowin -top control -json $@"
+	yosys -p "read_verilog $^; synth_gowin -top control -json $@" -e "Multiple conflicting drivers for"
 
 web_pnr.json: web.json ${BOARD}.cst
 	nextpnr-gowin --json $(filter %.json,$^) --freq ${FREQ_MHZ} --write $@ --device ${DEVICE} --family ${FAMILY} --cst ${BOARD}.cst
