@@ -1,0 +1,300 @@
+{
+  "creator": "Next Generation Place and Route (Version nextpnr-0.6-151-g6d932245)",
+  "modules": {
+    "top": {
+      "settings": {
+        "route": "00000000000000000000000000000001",
+        "router/tmg_ripup": "0 ",
+        "router1/useEstimate": "1 ",
+        "router1/fullCleanupReroute": "1 ",
+        "router1/cleanupReroute": "1 ",
+        "router1/maxIterCnt": "200",
+        "place": "00000000000000000000000000000001",
+        "placer1/startTemp": "1.000000",
+        "placer1/minBelsForGridPick": "64",
+        "placer1/netShareWeight": "0.000000",
+        "placer1/constraintWeight": "10.000000",
+        "placerHeap/cellPlacementTimeout": "8",
+        "placerHeap/netShareWeight": "0.000000",
+        "placerHeap/parallelRefine": "0 ",
+        "pack": "00000000000000000000000000000001",
+        "cst": "00000000000000000000000000000001",
+        "synth": "00000000000000000000000000000001",
+        "placerHeap/timingWeight": "10 ",
+        "placerHeap/criticalityExponent": "2",
+        "placerHeap/beta": "0.900000",
+        "placerHeap/alpha": "0.100000",
+        "seed": "01010011010110001001011110010011",
+        "arch.type": "none",
+        "arch.name": "ARCHNAME",
+        "router": "router1",
+        "placer": "heap",
+        "auto_freq": "00000000000000000000000000000000",
+        "slack_redist_iter": "00000000000000000000000000000000",
+        "timing_driven": "00000000000000000000000000000001",
+        "target_freq": "27000000.000000",
+        "arch.enable-auto-longwires": "00000000000000000000000000000000",
+        "arch.enable-globals": "00000000000000000000000000000001"
+      },
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "src/control.v:1.1-31.10"
+      },
+      "ports": {
+        "tx_serial": {
+          "direction": "output",
+          "bits": [ 628144 ]
+        },
+        "rx_serial": {
+          "direction": "input",
+          "bits": [ 628143 ]
+        },
+        "rom_mapped": {
+          "direction": "output",
+          "bits": [ 628142 ]
+        },
+        "clk": {
+          "direction": "input",
+          "bits": [ 628141 ]
+        },
+        "b": {
+          "direction": "output",
+          "bits": [ 628140 ]
+        },
+        "a": {
+          "direction": "output",
+          "bits": [ 628139 ]
+        }
+      },
+      "cells": {
+        "a_OBUF_O$iob": {
+          "hide_name": 0,
+          "type": "IOBS",
+          "parameters": {
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000001",
+            "INPUT_USED": "00000000000000000000000000000000"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R6C20_IOBG",
+            "src": "src/control.v:1.88-1.89"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [  ],
+            "OEN": [ 628658 ],
+            "I": [ 628658 ],
+            "PAD": [  ]
+          }
+        },
+        "b_OBUF_O$iob": {
+          "hide_name": 0,
+          "type": "IOBS",
+          "parameters": {
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000001",
+            "INPUT_USED": "00000000000000000000000000000000"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R6C20_IOBH",
+            "src": "src/control.v:1.98-1.99"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [  ],
+            "OEN": [ 628658 ],
+            "I": [ 628658 ],
+            "PAD": [  ]
+          }
+        },
+        "c.clk_IBUF_O$iob": {
+          "hide_name": 0,
+          "type": "IOB",
+          "parameters": {
+            "NET_O": "NET",
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000000",
+            "INPUT_USED": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R1C10_IOBA",
+            "src": "src/control.v:1.22-1.25",
+            "&PULL_MODE=UP": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [ 628639 ],
+            "OEN": [  ],
+            "I": [  ],
+            "PAD": [  ]
+          }
+        },
+        "rom_mapped_OBUF_O$iob": {
+          "hide_name": 0,
+          "type": "IOBS",
+          "parameters": {
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000001",
+            "INPUT_USED": "00000000000000000000000000000000"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R6C20_IOBF",
+            "src": "src/control.v:1.69-1.79"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [  ],
+            "OEN": [ 628658 ],
+            "I": [ 628658 ],
+            "PAD": [  ]
+          }
+        },
+        "rx_serial_IBUF_I$iob": {
+          "hide_name": 0,
+          "type": "IOB",
+          "parameters": {
+            "NET_O": "NET",
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000000",
+            "INPUT_USED": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R1C12_IOBB",
+            "src": "src/control.v:1.33-1.42",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [ 628645 ],
+            "OEN": [  ],
+            "I": [  ],
+            "PAD": [  ]
+          }
+        },
+        "tx_serial_OBUF_O$iob": {
+          "hide_name": 0,
+          "type": "IOB",
+          "parameters": {
+            "NET_I": "NET",
+            "ENABLE_USED": "00000000000000000000000000000000",
+            "OUTPUT_USED": "00000000000000000000000000000001",
+            "INPUT_USED": "00000000000000000000000000000000"
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000110",
+            "NEXTPNR_BEL": "R1C12_IOBA",
+            "src": "src/control.v:1.51-1.60",
+            "&IO_TYPE=LVCMOS33": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "O": "output",
+            "OEN": "input",
+            "I": "input",
+            "PAD": "inout"
+          },
+          "connections": {
+            "O": [  ],
+            "OEN": [  ],
+            "I": [ 628639 ],
+            "PAD": [  ]
+          }
+        },
+        "$PACKER_GND": {
+          "hide_name": 1,
+          "type": "GND",
+          "parameters": {
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000001",
+            "NEXTPNR_BEL": "GND"
+          },
+          "port_directions": {
+            "G": "output"
+          },
+          "connections": {
+            "G": [ 628658 ]
+          }
+        },
+        "$PACKER_VCC": {
+          "hide_name": 1,
+          "type": "VCC",
+          "parameters": {
+          },
+          "attributes": {
+            "BEL_STRENGTH": "00000000000000000000000000000010",
+            "NEXTPNR_BEL": "VCC"
+          },
+          "port_directions": {
+            "V": "output"
+          },
+          "connections": {
+            "V": [ 628660 ]
+          }
+        }
+      },
+      "netnames": {
+        "rx_serial_IBUF_I_O": {
+          "hide_name": 0,
+          "bits": [ 628645 ] ,
+          "attributes": {
+            "ROUTING": " ",
+            "unused_bits": "0 "
+          }
+        },
+        "c.clk": {
+          "hide_name": 0,
+          "bits": [ 628639 ] ,
+          "attributes": {
+            "ROUTING": "R1C10_F6;;5;R1C12_A0;R1C12_E111_A0;5;R1C11_EW10;R1C11_GB00_EW10;5;R1C14_GBO0;R1C14_GT00_GBO0;5;R7C14_GT00;R7C14_SPINE24_GT00;5;R6C11_SPINE24;R6C11_PCLKT0_SPINE24;5",
+            "src": "src/control.v:30.7-30.132|src/wasm.v:2.11-2.14",
+            "hdlname": "w clk"
+          }
+        },
+        "$PACKER_GND_NET": {
+          "hide_name": 1,
+          "bits": [ 628658 ] ,
+          "attributes": {
+            "ROUTING": "R6C20_W21;R6C20_VSS_W210;1;R6C20_A5;R6C20_W210_A5;1;R6C20_C0;R6C20_N220_C0;1;R6C20_A6;R6C20_W200_A6;1;R6C20_N25;R6C20_VSS_N250;1;R6C20_B7;R6C20_N250_B7;1;R6C20_N22;R6C20_VSS_N220;1;R6C20_C1;R6C20_N220_C1;1;VSS;;1;R6C20_W20;R6C20_VSS_W200;1;R6C20_A7;R6C20_W200_A7;1"
+          }
+        },
+        "$PACKER_VCC_NET": {
+          "hide_name": 1,
+          "bits": [ 628660 ] ,
+          "attributes": {
+            "ROUTING": " "
+          }
+        }
+      }
+    }
+  }
+}
