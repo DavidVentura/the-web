@@ -33,7 +33,7 @@ mem_01_adder.txt:
 	python3 to-verilog-mem.py 01-adder.wasm mem_01_adder.txt 256
 
 test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt
-	iverilog $(filter %.v,$^)
+	iverilog -DDEBUG=1 $(filter %.v,$^)
 	./a.out +TESTNAME=mem_01_adder.txt
 
 web.json: src/cpu.v src/wasm.v src/memory.v src/control.v
