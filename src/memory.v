@@ -7,8 +7,10 @@ module memory(
 	input memory_write_en,
 	output ready
 );
+	`define debug_print(statement) `ifdef DEBUG $display``statement `endif
 	// TODO: this caps out at 255
-	reg [7:0] mem [0:255];
+	//reg [7:0] mem [0:255];
+	reg [7:0] mem [0:63];
 	reg [7:0] data_out_r;
 
 	reg [31:0] last_addr = 0;
@@ -18,8 +20,8 @@ module memory(
 	assign data_out = data_out_r;
 
 	always @(posedge clk) begin
-		if (memory_read_en && addr !== last_addr) begin
-			$display("[MEM] Read  %x from %x", mem[addr & 8'hff], addr);
+		if (memory_read_en) begin // && addr !== last_addr) begin
+			`debug_print(("[MEM] Read  %x from %x", mem[addr & 8'hff], addr));
 			data_out_r <= mem[addr & 8'hff];
 			last_addr <= addr;
 			ready_r <= 1;
@@ -27,7 +29,7 @@ module memory(
 			ready_r <= 0;
 			if (memory_write_en) begin
 				last_addr <= 1'bx;
-				$display("[MEM] Wrote %x to   %x", data_in, addr);
+				`debug_print(("[MEM] Wrote %x to   %x", data_in, addr));
 				mem[addr & 8'hff] <= data_in;
 			end
 		end

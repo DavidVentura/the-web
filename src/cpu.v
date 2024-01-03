@@ -12,21 +12,21 @@ module cpu(
 	input  rom_mapped,
 	input  [31:0] first_instruction
 );
+	`define dp(statement) `ifdef DEBUG $display``statement `endif
 
-
-	reg [3:0]  state = 0;
-	reg [31:0] pc = 8'hzz;
-	reg [7:0]  instruction = 0;
-	reg [63:0] instr_imm = 0;
+	reg [3:0]  state;
+	reg [31:0] pc;
+	reg [7:0]  instruction;
+	reg [63:0] instr_imm;
 	reg [63:0] registers [31:0];
-	reg [7:0]  needed_operands = 0;
-	reg [7:0]  ready_operands = 0;
+	reg [7:0]  needed_operands;
+	reg [7:0]  ready_operands;
 	reg [63:0] _operand [1:0];
 
-	reg exec_done = 0;
+	reg exec_done;
 
-	reg [7:0]  op_stack_top = 8'haa;
-	reg [7:0]  call_stack_top = 8'h55;
+	reg [7:0]  op_stack_top;
+	reg [7:0]  call_stack_top;
 	// DEBUG
 	wire [7:0] _op_stack_top;
 	wire [7:0] _call_stack_top;
@@ -35,13 +35,13 @@ module cpu(
 	wire [63:0] operand1 = _operand[0];
 	wire [63:0] operand2 = _operand[1];
 
-	reg halted = 0;
+	reg halted;
 	// /DEBUG
 
-	reg [31:0] addr_r = 32'bz;
-	reg [7:0] data_in_r = 32'bz;
-	reg memory_read_en_r = 1'bz;
-	reg memory_write_en_r = 1'bz;
+	reg [31:0] addr_r;
+	reg [7:0] data_in_r;
+	reg memory_read_en_r;
+	reg memory_write_en_r;
 
 	assign addr = addr_r;
 	assign data_in = data_in_r;
@@ -71,6 +71,22 @@ module cpu(
 	localparam LOCAL_SET 	= 8'h21;
 	localparam UNREACHABLE  = 8'h00;
 
+	initial begin
+		state <= 0;
+		pc <= 'hz;
+		instruction <= 0;
+		instr_imm <= 0;
+		needed_operands <= 0;
+		ready_operands <= 0;
+		exec_done <= 0;
+		op_stack_top <= 8'haa;
+		call_stack_top <= 8'h55;
+		halted <= 0;
+		addr_r <= 'hz;
+		data_in_r <= 'hz;
+		memory_read_en_r <= 'hz;
+		memory_write_en_r <= 'hz;
+	end
 	function needs_immediate(input [7:0] inst);
 		begin
 			case(inst)
@@ -101,7 +117,7 @@ module cpu(
 					operands_for_instr = 2;
 				end
 				default: begin
-					$display("No idea how many operands for %x", inst);
+					`dp(("No idea how many operands for %x", inst));
 					//$finish;
 				end
 			endcase
@@ -115,28 +131,28 @@ module cpu(
 		begin
 			case(instruction)
 				I32_CONST: begin
-					$display("[E] i32.const %x", instr_imm);
+					`dp(("[E] i32.const %x", instr_imm));
 					op_stack_top <= op_stack_top + 1;
 					addr_r <= op_stack_top;
 					memory_write_en_r <= 1;
 					data_in_r <= instr_imm;
 				end
 				I32_ADD: begin
-					$display("[E] i32.add %x %x", _operand[0], _operand[1]);
+					`dp(("[E] i32.add %x %x", _operand[0], _operand[1]));
 					addr_r <= op_stack_top - 1;
 					memory_write_en_r <= 1;
 					data_in_r <= _operand[0] + _operand[1];
 					op_stack_top <= op_stack_top - 1;
 				end
 				CALL: begin
-					$display("[E] call %x", instr_imm);
+					`dp(("[E] call %x", instr_imm));
 					addr_r <= call_stack_top;
 					call_stack_top <= call_stack_top + 1;
 					memory_write_en_r <= 1;
 					data_in_r <= pc;
 				end
 				DROP: begin
-					$display("[E] call %x", instr_imm);
+					`dp(("[E] call %x", instr_imm));
 					op_stack_top <= op_stack_top - 1;
 				end
 				END_OF_FUNC: begin
@@ -146,7 +162,7 @@ module cpu(
 					state <= STATE_HALT;
 				end
 				default: begin
-					$display("No idea how to exec instruction %x", instruction);
+					`dp(("No idea how to exec instruction %x", instruction));
 				end
 			endcase
 			exec_done <= 1;
@@ -157,7 +173,7 @@ module cpu(
 		case(state)
 			STATE_BOOTSTRAP: begin
 				if (rom_mapped) begin
-					$display("[CPU] starting");
+					`dp(("[CPU] starting"));
 					memory_read_en_r <= 0;
 					state <= STATE_BOOTSTRAP_DONE;
 					pc <= first_instruction;
@@ -253,9 +269,9 @@ module cpu(
 			end
 			STATE_HALT: begin
 				halted <= 1;
-				memory_read_en_r <= 1'bz;
-				addr_r <= 32'bz;
-				data_in_r <= 8'bz;
+				memory_read_en_r <= 'hz;
+				addr_r <= 'hz;
+				data_in_r <= 'hz;
 			end
 		endcase
 	end

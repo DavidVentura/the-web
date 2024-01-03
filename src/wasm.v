@@ -15,6 +15,7 @@ module wasm(
 	output [31:0] first_instruction
 );
 
+`define debug_print(statement) `ifdef DEBUG $display``statement `endif
 localparam SECTION_HALT 	= 0;
 localparam SECTION_TYPE 	= 1;
 localparam SECTION_IMPORT 	= 2;
@@ -41,25 +42,25 @@ localparam FINISH_FUNC 		= 6;
 localparam CODE_BASE = 8'h30; // Per BOOT.md
 
 // CODE section regs
-reg [7:0] func_count = 1'bz;
-reg [7:0] curr_func = 1'bz;
-reg [7:0] func_len = 1'bz;
-reg [7:0] func_start_at = 1'bz;
-reg [7:0] local_blocks = 1'bz;
-reg [7:0] local_count = 1'bz;
-reg [7:0] local_type = 1'bz;
-reg [7:0] read_local_blocks = 1'bz;
-reg [7:0] read_func = 1'bz;
+reg [7:0] func_count = 'hz;
+reg [7:0] curr_func = 'hz;
+reg [7:0] func_len = 'hz;
+reg [7:0] func_start_at = 'hz;
+reg [7:0] local_blocks = 'hz;
+reg [7:0] local_count = 'hz;
+reg [7:0] local_type = 'hz;
+reg [7:0] read_local_blocks = 'hz;
+reg [7:0] read_func = 'hz;
 reg [31:0] code_block_base = CODE_BASE;
 
 // LEB
 reg leb_done = 0;
 
 reg [4:0] state = S_STARTUP;
-reg [4:0] substate = 1'bz;
+reg [4:0] substate = 'hz;
 reg [4:0] section = S_HALT;
-reg [4:0] next_section = 1'bz;
-reg [4:0] section_len = 1'bz;
+reg [4:0] next_section = 'hz;
+reg [4:0] section_len = 'hz;
 reg [31:0] wasm_base = 0;
 
 reg [15:0] current_b = 0; // index into the program
@@ -69,17 +70,17 @@ reg [31:0] first_instruction_r = 0;
 assign first_instruction = first_instruction_r;
 
 // interface to module
-reg rom_read_en_r = 1'bz;
+reg rom_read_en_r = 'hz;
 assign rom_read_en = rom_read_en_r;
-reg [31:0] rom_addr_r = 32'bz;
+reg [31:0] rom_addr_r = 'hz;
 assign rom_addr = rom_addr_r;
 
 // interface to mem
-reg mem_write_en_r = 1'bz;
+reg mem_write_en_r = 'hz;
 assign mem_write_en = mem_write_en_r;
-reg [31:0] mem_addr_r = 32'bz;
+reg [31:0] mem_addr_r = 'hz;
 assign mem_addr = mem_addr_r;
-reg [31:0] mem_data_in_r = 32'bz;
+reg [31:0] mem_data_in_r = 'hz;
 assign mem_data_in = mem_data_in_r;
 
 // result
@@ -88,7 +89,7 @@ assign rom_mapped = rom_mapped_r;
 
 reg [3:0] _leb_byte = 0;
 reg [31:0] _leb128 = 0;
-reg [7:0] pc_func_id = 1'bz;
+reg [7:0] pc_func_id = 'hz;
 
 
 always @(posedge clk) begin
@@ -134,9 +135,9 @@ always @(posedge clk) begin
 				end else begin
 					_leb128 <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 					if ((rom_data_out & 8'h80) != 8'h80) begin
-						$display("[BR] Section %x: len %x",
+						`debug_print(("[BR] Section %x: len %x",
 								 next_section,
-								 _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte)));
+								 _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte))));
 						rom_read_en_r <= 0;
 						section_len <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 						section <= next_section;
@@ -157,9 +158,9 @@ always @(posedge clk) begin
 			end
 		end
 		S_HALT: begin
-			mem_write_en_r <= 1'bz;
-			mem_addr_r <= 32'bz;
-			mem_data_in_r <= 8'bz;
+			mem_write_en_r <= 'hz;
+			mem_addr_r <= 'hz;
+			mem_data_in_r <= 'hz;
 		end
 	endcase
 end
@@ -309,13 +310,13 @@ always @(posedge clk) begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
-						$display("Next func starts at %x", code_block_base);
+						`debug_print(("Next func starts at %x", code_block_base));
 						if ((read_func + 1) < func_count) begin
 							substate <= READ_FUNC_LEN;
 						end else begin
 							state <= S_HALT;
 							section <= SECTION_HALT;
-							$display("Finished reading BOOTROM, pc: %x", first_instruction_r);
+							`debug_print(("Finished reading BOOTROM, pc: %x", first_instruction_r));
 							rom_mapped_r <= 1;
 						end
 					end
