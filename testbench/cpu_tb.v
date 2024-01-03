@@ -1,4 +1,3 @@
-`define DEBUG 1
 module rom(
 	input clk,
 	input [31:0] addr,
@@ -63,10 +62,15 @@ module cpu_tb;
 	assign memory_read_en = memory_read_en_r;
 	assign mem_addr = mem_addr_r;
 
-	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
+	wire [1:0] mem_access;
+	assign mem_access = rom_mapped ? 1 : 0;
+	wire wasm_mem_access = mem_access == 0;
+	wire cpu_mem_access = mem_access == 1;
+
+	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
-	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
+	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, wasm_mem_access, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
 
 	integer fd;
 	initial begin

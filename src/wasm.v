@@ -6,6 +6,7 @@ module wasm(
 	output rom_read_en,
 	input rom_ready,
 	// mem
+	input mem_access,
 	output [31:0] mem_addr,
 	output [7:0] mem_data_in,
 	output mem_write_en,
@@ -77,11 +78,11 @@ assign rom_addr = rom_addr_r;
 
 // interface to mem
 reg mem_write_en_r = 'hz;
-assign mem_write_en = mem_write_en_r;
+assign mem_write_en = mem_access ? mem_write_en_r : 'hz;
 reg [31:0] mem_addr_r = 'hz;
-assign mem_addr = mem_addr_r;
+assign mem_addr = mem_access ? mem_addr_r : 'hz;
 reg [31:0] mem_data_in_r = 'hz;
-assign mem_data_in = mem_data_in_r;
+assign mem_data_in = mem_access ? mem_data_in_r : 'hz;
 
 // result
 reg rom_mapped_r = 0;
@@ -158,9 +159,9 @@ always @(posedge clk) begin
 			end
 		end
 		S_HALT: begin
-			mem_write_en_r <= 'hz;
-			mem_addr_r <= 'hz;
-			mem_data_in_r <= 'hz;
+			//mem_write_en_r <= 'hz;
+			//mem_addr_r <= 'hz;
+			//mem_data_in_r <= 'hz;
 		end
 	endcase
 end
@@ -253,6 +254,7 @@ always @(posedge clk) begin
 					// vv Repeat #func_count
 					READ_FUNC_LEN: begin
 						func_len <= _leb128;
+						`debug_print(("There are %x functions", _leb128));
 						func_start_at <= rom_addr_r;
 						substate <= READ_BLOCK_COUNT;
 					end
@@ -269,7 +271,7 @@ always @(posedge clk) begin
 					READ_LOCAL_TYPE: begin
 						local_type <= _leb128;
 						read_local_blocks <= read_local_blocks + 1;
-						if ((read_local_blocks + 1) < local_blocks) begin
+						if ((read_local_blocks + 1) > local_blocks) begin
 							substate <= READ_LOCAL_COUNT;
 						end else begin
 							substate <= READ_CODE;

@@ -1,4 +1,5 @@
 module control(input clk, input rx_serial, output tx_serial, output rom_mapped, output a, output b);
+	wire [1:0] mem_access;
 	wire [31:0] mem_addr;
 	wire [7:0] mem_data_in;
 	wire [7:0] mem_data_out;
@@ -22,10 +23,15 @@ module control(input clk, input rx_serial, output tx_serial, output rom_mapped, 
 
 	assign tx_serial = clk;
 
-	cpu c(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
+	wire wasm_mem_access = mem_access[0];
+	wire cpu_mem_access = mem_access[1];
+
+	assign mem_access = rom_mapped ? 1 : 0;
+
+	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	// rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
 	// HACK vv
 	memory rom(clk, rom_addr, _rom_data_in, rom_data_out, rom_read_en, _rom_write_en, rom_ready);
-	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
+	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, wasm_mem_access, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
 endmodule

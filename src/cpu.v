@@ -1,6 +1,7 @@
 module cpu(
     input clk,
 	// mem
+	input mem_access,
 	output [31:0] addr,
 	output [7:0] data_in,
 	input  [7:0] data_out,
@@ -43,10 +44,10 @@ module cpu(
 	reg memory_read_en_r;
 	reg memory_write_en_r;
 
-	assign addr = addr_r;
-	assign data_in = data_in_r;
-	assign memory_read_en = memory_read_en_r;
-	assign memory_write_en = memory_write_en_r;
+	assign addr = mem_access ? addr_r : 'bz;
+	assign data_in = mem_access ? data_in_r : 'hz;
+	assign memory_read_en = mem_access ? memory_read_en_r : 'hz;
+	assign memory_write_en = mem_access ? memory_write_en_r : 'hz;
 
 	localparam STATE_BOOTSTRAP 				= 0;
 	localparam STATE_PARSING_ROM    		= 1;
