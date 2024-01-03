@@ -44,7 +44,7 @@ module cpu(
 	reg memory_write_en_r;
 
 	assign addr = mem_access ? addr_r : 'hz;
-	assign data_in = mem_access ? data_in_r : 'hz;
+	assign data_in = mem_access ? data_in_r : 8'hz;
 	assign memory_read_en = mem_access ? memory_read_en_r : 'hz;
 	assign memory_write_en = mem_access ? memory_write_en_r : 'hz;
 
@@ -80,10 +80,6 @@ module cpu(
 		exec_done <= 0;
 		op_stack_top <= 8'haa;
 		call_stack_top <= 8'h55;
-		//addr_r <= 'hz;
-		//data_in_r <= 'hz;
-		//memory_read_en_r <= 'hz;
-		//memory_write_en_r <= 'hz;
 	end
 	function needs_immediate(input [7:0] inst);
 		begin
@@ -262,7 +258,6 @@ module cpu(
 			STATE_HALT: begin
 				memory_read_en_r <= 'hz;
 				//addr_r <= 'hz;
-				//data_in_r <= 'hz;
 			end
 		endcase
 	end

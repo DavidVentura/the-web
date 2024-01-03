@@ -77,12 +77,13 @@ reg [31:0] rom_addr_r = 'hz;
 assign rom_addr = rom_addr_r;
 
 // interface to mem
-reg mem_write_en_r;
-assign mem_write_en = mem_access ? mem_write_en_r : 'hz;
 reg [31:0] mem_addr_r;
+reg [7:0] mem_data_in_r;
+reg mem_write_en_r;
+
+assign mem_write_en = mem_access ? mem_write_en_r : 'hz;
 assign mem_addr = mem_access ? mem_addr_r : 'hz;
-reg [31:0] mem_data_in_r;
-assign mem_data_in = mem_access ? mem_data_in_r : 'hz;
+assign mem_data_in = mem_access ? mem_data_in_r : 8'hz;
 
 // result
 reg rom_mapped_r = 0;
