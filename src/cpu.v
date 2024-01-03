@@ -121,7 +121,6 @@ module cpu(
 
 	task handle_instruction;
 		begin
-			if(memory_write_en_r) memory_write_en_r <= 0;
 			case(instruction)
 				I32_CONST: begin
 					`dp(("[E] i32.const %x", instr_imm));
@@ -186,6 +185,7 @@ module cpu(
 					pc <= pc + 1;
 					instr_imm <= 0;
 				end else begin
+					memory_write_en_r <= 0;
 					addr_r <= pc;
 					memory_read_en_r <= 1;
 					exec_done <= 0;

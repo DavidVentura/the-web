@@ -318,9 +318,6 @@ always @(posedge clk) begin
 			end
 		end
 		S_HALT: begin
-			//mem_write_en_r <= 'hz;
-			//mem_addr_r <= 'hz;
-			//mem_data_in_r <= 'hz;
 		end
 	endcase
 
