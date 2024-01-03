@@ -62,8 +62,19 @@ module cpu_tb;
 	assign memory_read_en = memory_read_en_r;
 	assign mem_addr = mem_addr_r;
 
-	wire [1:0] mem_access;
-	assign mem_access = rom_mapped ? 1 : 0;
+	reg [2:0] mem_access_r;
+	wire [2:0] mem_access;
+	reg cpu_done = 0;
+
+	assign mem_access = mem_access_r;
+
+	always @(posedge clk) begin
+		if(cpu_done) begin
+			mem_access_r <= 2;
+		end else begin
+			mem_access_r <=	rom_mapped ? 1 : 0;
+		end
+	end
 	wire wasm_mem_access = mem_access == 0;
 	wire cpu_mem_access = mem_access == 1;
 
@@ -87,6 +98,8 @@ module cpu_tb;
 	  $display("[%s]: Expected first FTE at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
 
 	  #80;
+	  cpu_done <= 1;
+	  @(posedge clk);
 
 	  mem_addr_r <= 8'hAB;
 	  memory_read_en_r <= 1;
