@@ -36,7 +36,6 @@ module cpu(
 	wire [63:0] operand1 = _operand[0];
 	wire [63:0] operand2 = _operand[1];
 
-	reg halted;
 	// /DEBUG
 
 	reg [31:0] addr_r;
@@ -44,13 +43,12 @@ module cpu(
 	reg memory_read_en_r;
 	reg memory_write_en_r;
 
-	assign addr = mem_access ? addr_r : 'bz;
+	assign addr = mem_access ? addr_r : 'hz;
 	assign data_in = mem_access ? data_in_r : 'hz;
 	assign memory_read_en = mem_access ? memory_read_en_r : 'hz;
 	assign memory_write_en = mem_access ? memory_write_en_r : 'hz;
 
 	localparam STATE_BOOTSTRAP 				= 0;
-	localparam STATE_PARSING_ROM    		= 1;
 	localparam STATE_BOOTSTRAP_DONE			= 2;
 	localparam STATE_FETCH 					= 3;
 	localparam STATE_FETCH_WAIT_START 		= 4;
@@ -82,11 +80,10 @@ module cpu(
 		exec_done <= 0;
 		op_stack_top <= 8'haa;
 		call_stack_top <= 8'h55;
-		halted <= 0;
-		addr_r <= 'hz;
-		data_in_r <= 'hz;
-		memory_read_en_r <= 'hz;
-		memory_write_en_r <= 'hz;
+		//addr_r <= 'hz;
+		//data_in_r <= 'hz;
+		//memory_read_en_r <= 'hz;
+		//memory_write_en_r <= 'hz;
 	end
 	function needs_immediate(input [7:0] inst);
 		begin
@@ -125,11 +122,10 @@ module cpu(
 		end
 	endfunction
 
-	always @(posedge clk) begin
-		if(memory_write_en_r) memory_write_en_r <= 0;
-	end
+
 	task handle_instruction;
 		begin
+			if(memory_write_en_r) memory_write_en_r <= 0;
 			case(instruction)
 				I32_CONST: begin
 					`dp(("[E] i32.const %x", instr_imm));
@@ -170,6 +166,7 @@ module cpu(
 		end
 	endtask
 
+	reg [3:0] _cur_retr_byte = 0;
 	always @(posedge clk) begin
 		case(state)
 			STATE_BOOTSTRAP: begin
@@ -185,12 +182,6 @@ module cpu(
 					state <= STATE_FETCH;
 				end
 			end
-		endcase
-	end
-
-	reg [3:0] _cur_retr_byte = 0;
-	always @(posedge clk) begin
-		case(state)
 			STATE_FETCH: begin
 				if (memory_ready) begin
 					instruction <= data_out;
@@ -269,10 +260,9 @@ module cpu(
 				end
 			end
 			STATE_HALT: begin
-				halted <= 1;
 				memory_read_en_r <= 'hz;
-				addr_r <= 'hz;
-				data_in_r <= 'hz;
+				//addr_r <= 'hz;
+				//data_in_r <= 'hz;
 			end
 		endcase
 	end
