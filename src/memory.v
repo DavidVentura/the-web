@@ -17,6 +17,12 @@ module memory(
 	reg ready_r = 0;
 	assign ready = ready_r;
 	assign data_out = data_out_r;
+	integer i;
+	initial begin
+		for(i=0; i<255; i=i+1) begin
+			mem[i] = i;
+		end
+	end
 
 	always @(posedge clk) begin
 		if (memory_read_en && addr !== last_addr) begin
