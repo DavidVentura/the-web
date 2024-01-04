@@ -44,3 +44,9 @@ web_pnr.json: web.json ${BOARD}.cst
 
 web.fs: web_pnr.json
 	gowin_pack -d ${FAMILY} -o $@ $^
+
+flash: web.fs
+	openFPGALoader -b ${BOARD} $^ -f
+
+flash_mem: web.fs
+	openFPGALoader -b ${BOARD} $^ # write to ram
