@@ -48,6 +48,16 @@ localparam TYPE_READ_ARG_TYPE 	= 3;
 localparam TYPE_READ_RET_COUNT 	= 4;
 localparam TYPE_READ_RET_TYPE 	= 5;
 
+// IMPORT substates
+localparam IMPORT_READ_COUNT			= 0;
+localparam IMPORT_READ_MODULE_NAME_LEN	= 1;
+localparam IMPORT_READ_MODULE_NAME		= 2;
+localparam IMPORT_READ_NAME_LEN			= 3;
+localparam IMPORT_READ_NAME				= 4;
+localparam IMPORT_READ_TYPE_ID			= 5;
+localparam IMPORT_READ_TYPE_INDEX		= 6;
+localparam IMPORT_READ_DONE				= 7;
+
 // FUNCTION sub-states
 localparam FUNCTION_READ_COUNT = 0;
 localparam FUNCTION_READ_TYPE 	= 1;
@@ -201,6 +211,32 @@ task handle_section(); begin
 						end
 					end
 				endcase
+			end else begin // !leb_done
+				read_leb128();
+			end
+		end
+		SECTION_IMPORT: begin
+			if (leb_done) begin
+				case(substate)
+					IMPORT_READ_COUNT: begin
+					end
+					// vv Repeat #import count
+					IMPORT_READ_MODULE_NAME_LEN: begin
+					end
+					IMPORT_READ_MODULE_NAME: begin
+					end
+					IMPORT_READ_NAME_LEN: begin
+					end
+					IMPORT_READ_NAME: begin
+					end
+					IMPORT_READ_TYPE_ID: begin
+					end
+					IMPORT_READ_TYPE_INDEX: begin
+					end
+					IMPORT_READ_DONE: begin
+					end
+				endcase
+
 			end else begin // !leb_done
 				read_leb128();
 			end
