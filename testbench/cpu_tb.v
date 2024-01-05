@@ -87,6 +87,8 @@ module cpu_tb;
 	initial begin
 		#400 $finish;
 	end
+
+	reg [31:0] pc;
 	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
@@ -95,7 +97,12 @@ module cpu_tb;
 	  #10;
 	  // Per BOOT.md
 
-	  $display("[%s]: Expected first FTE at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
+	  if($value$plusargs("PC=%x", pc)) begin
+		  $display("[%s]: Expected first FTE at 0x%X, got 0x%X", (first_instruction != pc) ? "ERROR" : "OK", pc, first_instruction);
+	  end else begin
+		  $display("Did not get PC passed");
+		  $finish;
+	  end
 
 	  #80;
 	  cpu_done <= 1;
