@@ -14,6 +14,7 @@ module cpu(
 	input  [31:0] first_instruction
 );
 	`define dp(statement) `ifdef DEBUG $display``statement `endif
+	`define die(statement) `ifdef DEBUG $display``statement; $finish; `endif
 
 	reg [3:0]  state;
 	reg [31:0] pc;
@@ -111,8 +112,7 @@ module cpu(
 					operands_for_instr = 2;
 				end
 				default: begin
-					`dp(("No idea how many operands for %x", inst));
-					//$finish;
+					`die(("No idea how many operands for %x", inst));
 				end
 			endcase
 		end
@@ -154,7 +154,7 @@ module cpu(
 					state <= STATE_HALT;
 				end
 				default: begin
-					`dp(("No idea how to exec instruction %x", instruction));
+					`die(("No idea how to exec instruction %x", instruction));
 				end
 			endcase
 			exec_done <= 1;
@@ -213,6 +213,7 @@ module cpu(
 					if ((data_out & 8'h80) == 8'h80) begin
 						_cur_retr_byte <= _cur_retr_byte + 1;
 					end else begin
+						`dp(("[E] Retrieved"));
 						memory_read_en_r <= 0;
 						ready_operands <= 0;
 						state <= instruction == CALL ? STATE_CALC_OPERANDS : STATE_LOAD_REG;

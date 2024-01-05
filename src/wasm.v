@@ -127,6 +127,8 @@ task handle_section(); begin
 			end
 		end
 		SECTION_FUNCTION: begin
+			if (leb_done) begin
+			end
 			if (rom_ready) begin
 				current_b <= current_b + 1;
 				if ((sec_idx + 1) == section_len) begin
@@ -145,6 +147,7 @@ task handle_section(); begin
 				current_b <= current_b + 1;
 				// TODO: Read a LEB128
 				pc_func_id <= rom_data_out;
+				`debug_print(("Start functon id is %x", rom_data_out));
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -164,23 +167,25 @@ task handle_section(); begin
 				   2.b. Read 1 LEB for type of the locals
 				 3. Read $length (1.) bytes of code
 			 */
-			if (leb_done || (substate == READ_CODE)) begin // ugh
+			if (leb_done || (substate == READ_CODE) || (substate == FINISH_FUNC)) begin // ugh
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
 						curr_func <= 0;
 						read_func <= 0;
 						substate <= READ_FUNC_LEN;
+						`debug_print(("There are %x functions", _leb128));
 					end
 					// vv Repeat #func_count
 					READ_FUNC_LEN: begin
+						`debug_print(("Func len is %x", _leb128));
 						func_len <= _leb128;
-						`debug_print(("There are %x functions", _leb128));
 						func_start_at <= rom_addr_r;
 						substate <= READ_BLOCK_COUNT;
 					end
 					READ_BLOCK_COUNT: begin
 						local_blocks <= _leb128;
+						`debug_print(("There are %x local blocks", _leb128));
 						substate <= (_leb128 == 0) ? READ_CODE : READ_LOCAL_COUNT;
 					end
 					// vv Repeat #local_blocks
@@ -207,8 +212,11 @@ task handle_section(); begin
 						// 	  - local_count * local_blocks (7 bit)
 						// 	  - imported (1 bit, always 0)
 
+						// TODO: `-2` means "no local blocks" which is not
+						// correct
 						if((read_func == pc_func_id) && first_instruction_r == 0) begin
-							first_instruction_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
+							`debug_print(("Starting to read code for START function"));
+							first_instruction_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 						end
 
 						if(!rom_ready) begin
@@ -221,7 +229,8 @@ task handle_section(); begin
 							mem_addr_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 							mem_data_in_r <= rom_data_out & 8'hFF; // FIXME byte?
 
-							if (current_b == (func_len + func_start_at + 1)) begin
+							if (current_b == (func_len + func_start_at)) begin
+								$display("At byte #%x (==%x), func is done", current_b, rom_data_out);
 								substate <= FINISH_FUNC;
 								rom_read_en_r <= 0;
 								code_block_base <= code_block_base + (func_len & 32'hfffffff0) + 16'h10;
@@ -233,10 +242,12 @@ task handle_section(); begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
-						`debug_print(("Next func starts at %x", code_block_base));
 						if ((read_func + 1) < func_count) begin
+							`debug_print(("Done reading function"));
+							`debug_print(("Next func starts at %x", code_block_base));
 							substate <= READ_FUNC_LEN;
 						end else begin
+							`debug_print(("Done reading all code"));
 							state <= S_HALT;
 							section <= SECTION_HALT;
 							`debug_print(("Finished reading BOOTROM, pc: %x", first_instruction_r));
