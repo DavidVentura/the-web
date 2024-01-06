@@ -31,13 +31,14 @@ localparam S_READ_WASM_MAGIC 	= 3;
 localparam S_STARTUP 			= 4;
 
 // CODE sub-states
-localparam READ_FUNC_COUNT 	= 0;
-localparam READ_FUNC_LEN    = 1;
-localparam READ_BLOCK_COUNT = 2;
-localparam READ_LOCAL_COUNT = 3;
-localparam READ_LOCAL_TYPE  = 4;
-localparam READ_CODE  		= 5;
-localparam FINISH_FUNC 		= 6;
+localparam READ_FUNC_COUNT 		= 0;
+localparam READ_FUNC_LEN    	= 1;
+localparam READ_BLOCK_COUNT 	= 2;
+localparam READ_LOCAL_COUNT 	= 3;
+localparam READ_LOCAL_TYPE  	= 4;
+localparam POPULATE_FTE_ENTRY 	= 5;
+localparam READ_CODE  			= 6;
+localparam FINISH_FUNC 			= 7;
 
 // TYPE sub-states
 localparam TYPE_READ_COUNT 		= 0;
@@ -55,7 +56,6 @@ localparam FUNCTION_READ_TYPE 	= 1;
 
 // CODE section regs
 reg [7:0] func_count = 'hz;
-reg [7:0] curr_func = 'hz;
 reg [7:0] func_len = 'hz;
 reg [7:0] func_start_at = 'hz;
 reg [7:0] local_blocks = 'hz;
@@ -63,6 +63,7 @@ reg [7:0] local_count = 'hz;
 reg [7:0] local_type = 'hz;
 reg [7:0] read_local_blocks = 'hz;
 reg [7:0] read_func = 'hz;
+reg [2:0] fte_addr_b = 'hz;
 reg [31:0] code_block_base = CODE_BASE;
 
 // LEB
@@ -267,11 +268,10 @@ task handle_section(); begin
 				   2.b. Read 1 LEB for type of the locals
 				 3. Read $length (1.) bytes of code
 			 */
-			if (leb_done || (substate == READ_CODE) || (substate == FINISH_FUNC)) begin // ugh
+			if (leb_done || (substate >= POPULATE_FTE_ENTRY)) begin // ugh
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
-						curr_func <= 0;
 						read_func <= 0;
 						substate <= READ_FUNC_LEN;
 						`debug_print(("There are %x functions", _leb128));
@@ -281,12 +281,13 @@ task handle_section(); begin
 						`debug_print(("Func len is %x", _leb128));
 						func_len <= _leb128;
 						func_start_at <= rom_addr_r;
+						fte_addr_b <= 0;
 						substate <= READ_BLOCK_COUNT;
 					end
 					READ_BLOCK_COUNT: begin
 						local_blocks <= _leb128;
 						`debug_print(("There are %x local blocks", _leb128));
-						substate <= (_leb128 == 0) ? READ_CODE : READ_LOCAL_COUNT;
+						substate <= (_leb128 == 0) ? POPULATE_FTE_ENTRY : READ_LOCAL_COUNT;
 					end
 					// vv Repeat #local_blocks
 					READ_LOCAL_COUNT: begin
@@ -300,7 +301,19 @@ task handle_section(); begin
 						if ((read_local_blocks + 1) > local_blocks) begin
 							substate <= READ_LOCAL_COUNT;
 						end else begin
+							substate <= POPULATE_FTE_ENTRY;
+						end
+					end
+					POPULATE_FTE_ENTRY: begin
+						if((fte_addr_b + 1) == 5) begin
+							mem_write_en_r <= 0;
 							substate <= READ_CODE;
+						end else begin
+							mem_write_en_r <= 1;
+							mem_addr_r <= FUNCTION_TABLE_BASE + (read_func * 5) + 3 - fte_addr_b;
+							mem_data_in_r <= code_block_base[(8*fte_addr_b)+:8];
+							fte_addr_b <= fte_addr_b + 1;
+							`debug_print(("Writing byte #%x into FTE", fte_addr_b));
 						end
 					end
 					READ_CODE: begin
@@ -396,6 +409,7 @@ always @(posedge clk) begin
 			_leb_byte <= 0;
 			section_len <= 0;
 			_leb128 <= 0;
+			mem_write_en_r <= 0;
 		end
 		S_READ_SECTION: begin
 			if (rom_ready) begin
