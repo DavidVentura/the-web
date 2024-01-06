@@ -108,7 +108,7 @@ module cpu_tb;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
-	  mem_addr_r <= 8'hAB;
+	  mem_addr_r <= 8'hAA;
 	  memory_read_en_r <= 1;
 	  @(posedge mem_ready);
 	  $display("[%s] ADD expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
