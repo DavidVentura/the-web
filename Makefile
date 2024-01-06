@@ -29,12 +29,15 @@ programs/01-adder/out: programs/01-adder/main.c Makefile
 	# -Wl,--export-all \
 	# -Wl,--lto-O3 \
 
+mem_02_call.txt:
+	python3 to-verilog-mem.py 02-call.wasm $@ 256
 mem_01_adder.txt:
-	python3 to-verilog-mem.py 01-adder.wasm mem_01_adder.txt 256
+	python3 to-verilog-mem.py 01-adder.wasm $@ 256
 
-test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt
+test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt mem_02_call.txt
 	iverilog -DDEBUG=1 $(filter %.v,$^)
-	./a.out +TESTNAME=mem_01_adder.txt
+	#./a.out +TESTNAME=mem_01_adder.txt +PC=30
+	./a.out +TESTNAME=mem_02_call.txt +PC=40
 
 web.json: src/cpu.v src/wasm.v src/memory.v src/control.v
 	yosys -p "read_verilog $^; synth_gowin -top control -json $@" -e "Multiple conflicting drivers for"

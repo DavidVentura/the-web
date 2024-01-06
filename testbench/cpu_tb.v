@@ -85,8 +85,10 @@ module cpu_tb;
 
 	integer fd;
 	initial begin
-		#400 $finish;
+		#800 $finish;
 	end
+
+	reg [31:0] pc;
 	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
@@ -95,16 +97,35 @@ module cpu_tb;
 	  #10;
 	  // Per BOOT.md
 
-	  $display("[%s]: Expected first FTE at 0x30, got 0x%X", (first_instruction != 8'h30) ? "ERROR" : "OK", first_instruction);
+	  if($value$plusargs("PC=%x", pc)) begin
+		  $display("[%s]: Expected first FTE at 0x%X, got 0x%X", (first_instruction != pc) ? "ERROR" : "OK", pc, first_instruction);
+	  end else begin
+		  $display("Did not get PC passed");
+		  $finish;
+	  end
 
-	  #80;
+	  #300;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
-	  mem_addr_r <= 8'hAB;
+	  mem_addr_r <= 8'hAA;
 	  memory_read_en_r <= 1;
 	  @(posedge mem_ready);
-	  $display("[%s] expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
+	  $display("[%s] ADD expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
+
+	  memory_read_en_r <= 0;
+	  @(posedge clk);
+	  memory_read_en_r <= 1;
+	  mem_addr_r <= 16'h604;
+	  @(posedge mem_ready);
+	  $display("[%s] FTE expected 0x8, got 0x%X", (mem_data_out !== 8'h08) ? "ERROR": "OK", mem_data_out);
+
+	  memory_read_en_r <= 0;
+	  @(posedge clk);
+	  memory_read_en_r <= 1;
+	  mem_addr_r <= 16'h609;
+	  @(posedge mem_ready);
+	  $display("[%s] FTE expected 0x0, got 0x%X", (mem_data_out !== 8'h00) ? "ERROR": "OK", mem_data_out);
 	  #10;
 	  $finish;
 	end

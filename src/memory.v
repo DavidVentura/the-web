@@ -8,8 +8,9 @@ module memory(
 	output ready
 );
 	`define debug_print(statement) `ifdef DEBUG $display``statement `endif
-	// TODO: this caps out at 255
-	reg [7:0] mem [0:255];
+	// bram is 18kbit = 2250 byte = 0x8ca
+	// this consumes 2 blocks
+	reg [7:0] mem [0:2250*2];
 	reg [7:0] data_out_r;
 
 	reg [31:0] last_addr = 0;
@@ -26,8 +27,8 @@ module memory(
 
 	always @(posedge clk) begin
 		if (memory_read_en && addr !== last_addr) begin
-			`debug_print(("[MEM] Read  %x from %x", mem[addr & 8'hff], addr));
-			data_out_r <= mem[addr & 8'hff];
+			`debug_print(("[MEM] Read  %x from %x", mem[addr & 16'hffff], addr));
+			data_out_r <= mem[addr & 16'hffff];
 			last_addr <= addr;
 			ready_r <= 1;
 		end else begin
@@ -35,7 +36,7 @@ module memory(
 			if (memory_write_en) begin
 				last_addr <= 1'bz;
 				`debug_print(("[MEM] Wrote %x to   %x", data_in, addr));
-				mem[addr & 8'hff] <= data_in;
+				mem[addr & 16'hffff] <= data_in;
 			end
 		end
 	end

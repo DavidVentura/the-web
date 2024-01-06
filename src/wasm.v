@@ -31,20 +31,31 @@ localparam S_READ_WASM_MAGIC 	= 3;
 localparam S_STARTUP 			= 4;
 
 // CODE sub-states
-localparam READ_FUNC_COUNT 	= 0;
-localparam READ_FUNC_LEN    = 1;
-localparam READ_BLOCK_COUNT = 2;
-localparam READ_LOCAL_COUNT = 3;
-localparam READ_LOCAL_TYPE  = 4;
-localparam READ_CODE  		= 5;
-localparam FINISH_FUNC 		= 6;
+localparam READ_FUNC_COUNT 		= 0;
+localparam READ_FUNC_LEN    	= 1;
+localparam READ_BLOCK_COUNT 	= 2;
+localparam READ_LOCAL_COUNT 	= 3;
+localparam READ_LOCAL_TYPE  	= 4;
+localparam POPULATE_FTE_ENTRY 	= 5;
+localparam READ_CODE  			= 6;
+localparam FINISH_FUNC 			= 7;
 
-// Platform constants
-localparam CODE_BASE = 8'h30; // Per BOOT.md
+// TYPE sub-states
+localparam TYPE_READ_COUNT 		= 0;
+localparam TYPE_READ_TYPE_TAG 	= 1;
+localparam TYPE_READ_ARG_COUNT 	= 2;
+localparam TYPE_READ_ARG_TYPE 	= 3;
+localparam TYPE_READ_RET_COUNT 	= 4;
+localparam TYPE_READ_RET_TYPE 	= 5;
+
+// FUNCTION sub-states
+localparam FUNCTION_READ_COUNT = 0;
+localparam FUNCTION_READ_TYPE 	= 1;
+
+`include "src/platform.v"
 
 // CODE section regs
 reg [7:0] func_count = 'hz;
-reg [7:0] curr_func = 'hz;
 reg [7:0] func_len = 'hz;
 reg [7:0] func_start_at = 'hz;
 reg [7:0] local_blocks = 'hz;
@@ -52,6 +63,7 @@ reg [7:0] local_count = 'hz;
 reg [7:0] local_type = 'hz;
 reg [7:0] read_local_blocks = 'hz;
 reg [7:0] read_func = 'hz;
+reg [2:0] fte_addr_b = 'hz;
 reg [31:0] code_block_base = CODE_BASE;
 
 // LEB
@@ -109,35 +121,126 @@ task read_leb128();
 	end
 endtask
 
+reg [7:0] type_count;
+reg [7:0] type_cur_idx;
+reg [7:0] type_arg_count;
+reg [7:0] type_arg_cur_idx;
+reg [7:0] type_ret_count;
+reg [7:0] type_ret_cur_idx;
+
+// Store up to 16 types
+// Each of which may have up to 16 arg
+reg [3:0] _type_arg_count [0:15];
+
+reg [3:0] func_idx;
 task handle_section(); begin
 	case(section)
 		SECTION_TYPE: begin
 			// TODO: Store type info ??
-			if (rom_ready) begin
-				current_b <= current_b + 1;
-				if ((sec_idx + 1) == section_len) begin
-					state <= S_PRE_READ_SECTION;
-					section <= SECTION_HALT;
-				end else begin
-					sec_idx <= sec_idx + 1;
-				end
-			end else begin
-				rom_addr_r <= current_b;
-				rom_read_en_r <= 1;
+			if (leb_done) begin
+				case(substate)
+					TYPE_READ_COUNT: begin
+						type_count <= _leb128;
+						substate <= TYPE_READ_TYPE_TAG;
+						type_cur_idx <= 0;
+						`debug_print(("%x types", _leb128));
+					end
+					// vv Repeat #count
+					TYPE_READ_TYPE_TAG: begin
+						substate <= TYPE_READ_ARG_COUNT;
+						`debug_print(("type-tag %x", _leb128));
+					end
+					TYPE_READ_ARG_COUNT: begin
+						`debug_print(("argc %x", _leb128));
+						type_arg_count <= _leb128;
+						type_arg_cur_idx <= 0;
+						_type_arg_count[type_cur_idx] <= _leb128 & 4'hf;
+						if(_leb128 > 0) begin
+							substate <= TYPE_READ_ARG_TYPE;
+						end else begin
+							substate <= TYPE_READ_RET_COUNT;
+						end
+					end
+					// -> Repeat #arg-count
+					TYPE_READ_ARG_TYPE: begin
+						type_arg_cur_idx <= type_arg_cur_idx + 1;
+						`debug_print(("type #%x = %x", type_arg_cur_idx + 1, _leb128));
+						if ((type_arg_cur_idx + 1) == type_arg_count) begin
+							substate <= TYPE_READ_RET_COUNT;
+						end
+					end
+					TYPE_READ_RET_COUNT: begin
+						`debug_print(("retc %x", _leb128));
+						type_ret_count <= _leb128;
+						type_ret_cur_idx <= 0;
+						if(_leb128 > 0) begin
+							substate <= TYPE_READ_RET_TYPE;
+						end else begin
+							type_cur_idx <= type_cur_idx + 1;
+							if ((type_cur_idx + 1) == type_count) begin
+								state <= S_PRE_READ_SECTION;
+								section <= SECTION_HALT;
+							end else begin
+								substate <= TYPE_READ_TYPE_TAG;
+							end
+						end
+					end
+					// -> Repeat #ret-count
+					TYPE_READ_RET_TYPE: begin
+						type_ret_cur_idx <= type_ret_cur_idx + 1;
+						`debug_print(("ret-type #%x = %x", type_ret_cur_idx + 1, _leb128));
+						if ((type_ret_cur_idx + 1) == type_ret_count) begin
+							type_cur_idx <= type_cur_idx + 1;
+							if ((type_cur_idx + 1) == type_count) begin
+								state <= S_PRE_READ_SECTION;
+								section <= SECTION_HALT;
+							end else begin
+								substate <= TYPE_READ_TYPE_TAG;
+								`debug_print(("Arg count at fn #%x = %x", type_cur_idx, _type_arg_count[type_cur_idx]));
+							end
+						end
+					end
+				endcase
+			end else begin // !leb_done
+				read_leb128();
 			end
 		end
 		SECTION_FUNCTION: begin
-			if (rom_ready) begin
-				current_b <= current_b + 1;
-				if ((sec_idx + 1) == section_len) begin
-					state <= S_PRE_READ_SECTION;
-					section <= SECTION_HALT;
-				end else begin
-					sec_idx <= sec_idx + 1;
-				end
-			end else begin
-				rom_addr_r <= current_b;
-				rom_read_en_r <= 1;
+			if (leb_done) begin
+				case(substate)
+					FUNCTION_READ_COUNT: begin
+						func_count <= _leb128;
+						func_idx <= 0;
+						substate <= FUNCTION_READ_TYPE;
+					end
+					FUNCTION_READ_TYPE: begin
+						func_idx <= func_idx + 1;
+						mem_write_en_r <= 1;
+						// We are writing a function table entry, per BOOT.md:
+						// 4 bytes address
+						// 1 byte of:
+						// 	arg count (6) bits
+						// 	is-import (1 bit)
+						// 	is-service (1-bit)
+						//
+						// In this section we only know the value of the last
+						// byte
+						mem_addr_r <= FUNCTION_TABLE_BASE + (func_idx * 5) + 4;
+						// by virtue of being in SECTION_FUCTION is-import and
+						// is-service _must_ be 0, as these are locally
+						// defined functions
+						// The 6 bits of argc are shifted 2 to the left as 
+						// the bottom two bits are [is-import,is-service]
+						// which are [0,0]
+						mem_data_in_r <= ((_type_arg_count[func_idx] & 6'b111111) << 2);
+						if ((func_idx + 1) == func_count) begin
+							state <= S_PRE_READ_SECTION;
+							section <= SECTION_HALT;
+						end
+					end
+				endcase
+			end else begin // !leb_done
+				read_leb128();
 			end
 		end
 		SECTION_START: begin
@@ -145,6 +248,7 @@ task handle_section(); begin
 				current_b <= current_b + 1;
 				// TODO: Read a LEB128
 				pc_func_id <= rom_data_out;
+				`debug_print(("Start functon id is %x", rom_data_out));
 				if ((sec_idx + 1) == section_len) begin
 					state <= S_PRE_READ_SECTION;
 					section <= SECTION_HALT;
@@ -164,24 +268,26 @@ task handle_section(); begin
 				   2.b. Read 1 LEB for type of the locals
 				 3. Read $length (1.) bytes of code
 			 */
-			if (leb_done || (substate == READ_CODE)) begin // ugh
+			if (leb_done || (substate >= POPULATE_FTE_ENTRY)) begin // ugh
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
-						curr_func <= 0;
 						read_func <= 0;
 						substate <= READ_FUNC_LEN;
+						`debug_print(("There are %x functions", _leb128));
 					end
 					// vv Repeat #func_count
 					READ_FUNC_LEN: begin
+						`debug_print(("Func len is %x", _leb128));
 						func_len <= _leb128;
-						`debug_print(("There are %x functions", _leb128));
 						func_start_at <= rom_addr_r;
+						fte_addr_b <= 0;
 						substate <= READ_BLOCK_COUNT;
 					end
 					READ_BLOCK_COUNT: begin
 						local_blocks <= _leb128;
-						substate <= (_leb128 == 0) ? READ_CODE : READ_LOCAL_COUNT;
+						`debug_print(("There are %x local blocks", _leb128));
+						substate <= (_leb128 == 0) ? POPULATE_FTE_ENTRY : READ_LOCAL_COUNT;
 					end
 					// vv Repeat #local_blocks
 					READ_LOCAL_COUNT: begin
@@ -195,7 +301,19 @@ task handle_section(); begin
 						if ((read_local_blocks + 1) > local_blocks) begin
 							substate <= READ_LOCAL_COUNT;
 						end else begin
+							substate <= POPULATE_FTE_ENTRY;
+						end
+					end
+					POPULATE_FTE_ENTRY: begin
+						if((fte_addr_b + 1) == 5) begin
+							mem_write_en_r <= 0;
 							substate <= READ_CODE;
+						end else begin
+							mem_write_en_r <= 1;
+							mem_addr_r <= FUNCTION_TABLE_BASE + (read_func * 5) + 3 - fte_addr_b;
+							mem_data_in_r <= code_block_base[(8*fte_addr_b)+:8];
+							fte_addr_b <= fte_addr_b + 1;
+							`debug_print(("Writing byte #%x into FTE", fte_addr_b));
 						end
 					end
 					READ_CODE: begin
@@ -207,8 +325,11 @@ task handle_section(); begin
 						// 	  - local_count * local_blocks (7 bit)
 						// 	  - imported (1 bit, always 0)
 
+						// TODO: `-2` means "no local blocks" which is not
+						// correct
 						if((read_func == pc_func_id) && first_instruction_r == 0) begin
-							first_instruction_r <= CODE_BASE + (current_b-func_start_at-2); // FIXME -2
+							`debug_print(("Starting to read code for START function"));
+							first_instruction_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 						end
 
 						if(!rom_ready) begin
@@ -221,7 +342,8 @@ task handle_section(); begin
 							mem_addr_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 							mem_data_in_r <= rom_data_out & 8'hFF; // FIXME byte?
 
-							if (current_b == (func_len + func_start_at + 1)) begin
+							if (current_b == (func_len + func_start_at)) begin
+								$display("At byte #%x (==%x), func is done", current_b, rom_data_out);
 								substate <= FINISH_FUNC;
 								rom_read_en_r <= 0;
 								code_block_base <= code_block_base + (func_len & 32'hfffffff0) + 16'h10;
@@ -233,10 +355,12 @@ task handle_section(); begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
-						`debug_print(("Next func starts at %x", code_block_base));
 						if ((read_func + 1) < func_count) begin
+							`debug_print(("Done reading function"));
+							`debug_print(("Next func starts at %x", code_block_base));
 							substate <= READ_FUNC_LEN;
 						end else begin
+							`debug_print(("Done reading all code"));
 							state <= S_HALT;
 							section <= SECTION_HALT;
 							`debug_print(("Finished reading BOOTROM, pc: %x", first_instruction_r));
@@ -285,6 +409,7 @@ always @(posedge clk) begin
 			_leb_byte <= 0;
 			section_len <= 0;
 			_leb128 <= 0;
+			mem_write_en_r <= 0;
 		end
 		S_READ_SECTION: begin
 			if (rom_ready) begin
@@ -301,10 +426,8 @@ always @(posedge clk) begin
 						rom_read_en_r <= 0;
 						section_len <= _leb128 | ((rom_data_out & 8'h7F) << (7 * _leb_byte));
 						section <= next_section;
-						if(next_section == SECTION_CODE) begin
-							substate <= READ_FUNC_COUNT;
-							_leb128 <= 0;
-						end
+						substate <= TYPE_READ_COUNT;
+						_leb128 <= 0;
 						sec_idx <= 0;
 						_leb_byte <= 0;
 						state <= S_HALT;
