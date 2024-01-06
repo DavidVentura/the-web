@@ -131,6 +131,7 @@ module cpu(
 
 	task handle_instruction;
 		begin
+			`dp(("[E] pc=%x", pc));
 			case(instruction)
 				I32_CONST: begin
 					`dp(("[E] i32.const %x", instr_imm));
@@ -153,6 +154,7 @@ module cpu(
 					memory_write_en_r <= 1;
 					data_in_r <= pc;
 					pc <= pc_for_call;
+					`dp(("[E] new PC %x", pc_for_call));
 				end
 				DROP: begin
 					`dp(("[E] call %x", instr_imm));
@@ -251,17 +253,19 @@ module cpu(
 
 							needed_operands <= data_out >> 2;
 							substate <= LOAD_NEW_PC;
-							// here reading 1 byte before AKA LSB for addr
+							// FIXME here reading 1 byte before AKA LSB for addr
 							addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5) + 3;
 						end
 					end
 					LOAD_NEW_PC: begin
 						// FIXME need 4 bytes
 						// FIXME base lookup
-						pc_for_call <= data_out;
-						`dp(("[E] call jmp into %x", data_out));
-						state <= STATE_LOAD_REG;
-						memory_read_en_r <= 0;
+						if(memory_ready) begin
+							pc_for_call <= data_out;
+							`dp(("[E] call jmp into %x", data_out));
+							state <= STATE_LOAD_REG;
+							memory_read_en_r <= 0;
+						end
 					end
 				endcase
 			end
