@@ -15,16 +15,16 @@ The first page is used to control the CPU
 * 0x18: Function table length
 * 0x20: Operand stack _top_
 * 0x28: Call stack _top_
-* 0x30: Code (until 0x1000)
+* 0x30: Code (until 0x500)
 
 ## State out of reset
 
 MMU has 1 entry, page 0 points to physical address 0
 
-* PT: 0x1000 (until 0x2000)
-* FT: 0x2000 (until 0x3000)
-* OP stack: 0x3000 (until 0x4000)
-* Memory: 0x4000-0xFFFF 
+* PT: 0x500 (until 0x600)
+* FT: 0x600 (until 0x700)
+* OP stack: 0x700 (until 0x1000)
+* Memory: 0x1000-0xFFFF 
 
 ### Page tables
 
