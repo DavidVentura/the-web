@@ -31,6 +31,8 @@ module cpu(
 	reg call_is_import;
 	reg call_is_service;
 
+	reg end_of_prog = 0;
+
 	// sub-states for CALL CALC_OPERANDS
 	localparam PREP_OPERAND_COUNT 	= 0;
 	localparam LOAD_NEW_PC 			= 1;
@@ -112,10 +114,10 @@ module cpu(
 	function [2:0] operands_for_instr(input [7:0] inst);
 		begin
 			case(inst)
-				END_OF_FUNC, LOCAL_SET, I32_CONST, UNREACHABLE: begin
+				END_OF_FUNC, LOCAL_SET, LOCAL_GET, I32_CONST, UNREACHABLE: begin
 					operands_for_instr = 0;
 				end
-				DROP, LOCAL_GET: begin
+				DROP: begin
 					operands_for_instr = 1;
 				end
 				I32_ADD, I32_MUL: begin
@@ -160,8 +162,30 @@ module cpu(
 					`dp(("[E] call %x", instr_imm));
 					op_stack_top <= op_stack_top - 1;
 				end
+				LOCAL_GET: begin
+					`dp(("[E] local_get #%x = %x", instr_imm, _operand[instr_imm]));
+					op_stack_top <= op_stack_top + 1;
+					addr_r <= op_stack_top;
+					memory_write_en_r <= 1;
+					data_in_r <= _operand[instr_imm];
+				end
 				END_OF_FUNC: begin
-					// NOP
+					if (call_stack_top == 8'h55) begin // TODO FIXME
+						end_of_prog = 1;
+						memory_read_en_r <= 0;
+						`dp(("[E] EOF end of program"));
+					end else begin
+						if (memory_ready) begin
+							call_stack_top <= call_stack_top - 1;
+							pc <= data_out;
+							exec_done <= 1;
+							`dp(("[E] EOF (RET) to %x", data_out));
+						end else begin
+							addr_r <= call_stack_top - 1;
+							memory_read_en_r <= 1;
+							exec_done <= 0;
+						end
+					end
 				end
 				UNREACHABLE: begin
 					state <= STATE_HALT;
@@ -170,7 +194,9 @@ module cpu(
 					`die(("No idea how to exec instruction %x", instruction));
 				end
 			endcase
-			exec_done <= 1;
+			if (instruction != END_OF_FUNC) begin
+				exec_done <= 1;
+			end
 		end
 	endtask
 
@@ -205,6 +231,10 @@ module cpu(
 				end
 			end
 			STATE_DECODE: begin
+				if(instruction != CALL) begin
+					needed_operands <= operands_for_instr(instruction);
+					`dp(("For inst %x need #%x ops", instruction, operands_for_instr(instruction)));
+				end
 				if (needs_immediate(instruction)) begin
 					state <= STATE_RETRIEVE;
 				end else begin
@@ -213,7 +243,6 @@ module cpu(
 					ready_operands <= 0;
 					state <= STATE_LOAD_REG;
 					memory_read_en_r <= 0;
-					needed_operands <= operands_for_instr(instruction);
 				end
 			end
 			STATE_RETRIEVE: begin
@@ -275,10 +304,12 @@ module cpu(
 					memory_read_en_r <= 0;
 				end else begin
 					if (memory_ready) begin
+						`dp(("Fetghing operand into reg from stack"));
 						_operand[needed_operands-ready_operands-1] <= data_out;
 						ready_operands <= ready_operands + 1; 
 						addr_r <= op_stack_top - (ready_operands+1) - 1;
 						if ((ready_operands + 1) == needed_operands) begin
+							op_stack_top <= op_stack_top - needed_operands;
 							memory_read_en_r <= 0;
 							state <= STATE_EXECUTE;
 						end
@@ -292,6 +323,8 @@ module cpu(
 				if (exec_done) begin
 					state <= STATE_FETCH;
 					instruction <= 0;
+				end else if (end_of_prog) begin
+					state <= STATE_HALT;
 				end else begin
 					handle_instruction();
 				end
