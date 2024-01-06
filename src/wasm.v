@@ -39,6 +39,15 @@ localparam READ_LOCAL_TYPE  = 4;
 localparam READ_CODE  		= 5;
 localparam FINISH_FUNC 		= 6;
 
+// TYPE sub-states
+localparam TYPE_READ_COUNT 		= 0;
+localparam TYPE_READ_TYPE_TAG 	= 1;
+localparam TYPE_READ_ARG_COUNT 	= 2;
+localparam TYPE_READ_ARG_TYPE 	= 3;
+localparam TYPE_READ_RET_COUNT 	= 4;
+localparam TYPE_READ_RET_TYPE 	= 5;
+localparam TYPE_READ_DONE 		= 6;
+
 // Platform constants
 localparam CODE_BASE = 8'h30; // Per BOOT.md
 
@@ -109,21 +118,85 @@ task read_leb128();
 	end
 endtask
 
+reg [7:0] type_count;
+reg [7:0] type_cur_idx;
+reg [7:0] type_arg_count;
+reg [7:0] type_arg_cur_idx;
+reg [7:0] type_ret_count;
+reg [7:0] type_ret_cur_idx;
+
+// Store up to 16 types
+// Each of which may have up to 16 arg
+reg [3:0] _type_arg_count [0:15];
 task handle_section(); begin
 	case(section)
 		SECTION_TYPE: begin
 			// TODO: Store type info ??
-			if (rom_ready) begin
-				current_b <= current_b + 1;
-				if ((sec_idx + 1) == section_len) begin
-					state <= S_PRE_READ_SECTION;
-					section <= SECTION_HALT;
-				end else begin
-					sec_idx <= sec_idx + 1;
-				end
-			end else begin
-				rom_addr_r <= current_b;
-				rom_read_en_r <= 1;
+			if (leb_done) begin
+				case(substate)
+					TYPE_READ_COUNT: begin
+						type_count <= _leb128;
+						substate <= TYPE_READ_TYPE_TAG;
+						type_cur_idx <= 0;
+						`debug_print(("%x types", _leb128));
+					end
+					// vv Repeat #count
+					TYPE_READ_TYPE_TAG: begin
+						substate <= TYPE_READ_ARG_COUNT;
+						`debug_print(("type-tag %x", _leb128));
+					end
+					TYPE_READ_ARG_COUNT: begin
+						`debug_print(("argc %x", _leb128));
+						type_arg_count <= _leb128;
+						type_arg_cur_idx <= 0;
+						_type_arg_count[type_cur_idx] <= _leb128 & 4'hf;
+						if(_leb128 > 0) begin
+							substate <= TYPE_READ_ARG_TYPE;
+						end else begin
+							substate <= TYPE_READ_RET_COUNT;
+						end
+					end
+					// -> Repeat #arg-count
+					TYPE_READ_ARG_TYPE: begin
+						type_arg_cur_idx <= type_arg_cur_idx + 1;
+						`debug_print(("type #%x = %x", type_arg_cur_idx + 1, _leb128));
+						if ((type_arg_cur_idx + 1) == type_arg_count) begin
+							substate <= TYPE_READ_RET_COUNT;
+						end
+					end
+					TYPE_READ_RET_COUNT: begin
+						`debug_print(("retc %x", _leb128));
+						type_ret_count <= _leb128;
+						type_ret_cur_idx <= 0;
+						if(_leb128 > 0) begin
+							substate <= TYPE_READ_RET_TYPE;
+						end else begin
+							type_cur_idx <= type_cur_idx + 1;
+							substate <= TYPE_READ_DONE;
+						end
+					end
+					// -> Repeat #ret-count
+					TYPE_READ_RET_TYPE: begin
+						type_ret_cur_idx <= type_ret_cur_idx + 1;
+						`debug_print(("ret-type #%x = %x", type_ret_cur_idx + 1, _leb128));
+						if ((type_ret_cur_idx + 1) == type_ret_count) begin
+							type_cur_idx <= type_cur_idx + 1;
+							if ((type_cur_idx + 1) == type_count) begin
+								substate <= TYPE_READ_DONE;
+							end else begin
+								substate <= TYPE_READ_TYPE_TAG;
+								`debug_print(("Arg count at fn #%x = %x", type_cur_idx, _type_arg_count[type_cur_idx]));
+							end
+						end
+					end
+					TYPE_READ_DONE: begin
+						state <= S_PRE_READ_SECTION;
+						section <= SECTION_HALT;
+						`debug_print(("Arg count at fn #%x = %x", type_cur_idx-1, _type_arg_count[type_cur_idx-1]));
+					end
+				endcase
+			end else begin // !leb_done
+				read_leb128();
 			end
 		end
 		SECTION_FUNCTION: begin
@@ -314,6 +387,10 @@ always @(posedge clk) begin
 						section <= next_section;
 						if(next_section == SECTION_CODE) begin
 							substate <= READ_FUNC_COUNT;
+							_leb128 <= 0;
+						end
+						if(next_section == SECTION_TYPE) begin
+							substate <= TYPE_READ_COUNT;
 							_leb128 <= 0;
 						end
 						sec_idx <= 0;
