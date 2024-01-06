@@ -85,7 +85,7 @@ module cpu_tb;
 
 	integer fd;
 	initial begin
-		#400 $finish;
+		#800 $finish;
 	end
 
 	reg [31:0] pc;
@@ -104,14 +104,28 @@ module cpu_tb;
 		  $finish;
 	  end
 
-	  #80;
+	  #300;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
 	  mem_addr_r <= 8'hAB;
 	  memory_read_en_r <= 1;
 	  @(posedge mem_ready);
-	  $display("[%s] expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
+	  $display("[%s] ADD expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
+
+	  memory_read_en_r <= 0;
+	  @(posedge clk);
+	  memory_read_en_r <= 1;
+	  mem_addr_r <= 16'h604;
+	  @(posedge mem_ready);
+	  $display("[%s] FTE expected 0x8, got 0x%X", (mem_data_out !== 8'h08) ? "ERROR": "OK", mem_data_out);
+
+	  memory_read_en_r <= 0;
+	  @(posedge clk);
+	  memory_read_en_r <= 1;
+	  mem_addr_r <= 16'h609;
+	  @(posedge mem_ready);
+	  $display("[%s] FTE expected 0x0, got 0x%X", (mem_data_out !== 8'h00) ? "ERROR": "OK", mem_data_out);
 	  #10;
 	  $finish;
 	end
