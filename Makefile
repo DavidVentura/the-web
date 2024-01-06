@@ -36,7 +36,7 @@ mem_01_adder.txt:
 
 test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt mem_02_call.txt
 	iverilog -DDEBUG=1 $(filter %.v,$^)
-	#./a.out +TESTNAME=mem_01_adder.txt
+	#./a.out +TESTNAME=mem_01_adder.txt +PC=30
 	./a.out +TESTNAME=mem_02_call.txt +PC=40
 
 web.json: src/cpu.v src/wasm.v src/memory.v src/control.v
