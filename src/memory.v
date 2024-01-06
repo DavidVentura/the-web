@@ -27,8 +27,8 @@ module memory(
 
 	always @(posedge clk) begin
 		if (memory_read_en && addr !== last_addr) begin
-			`debug_print(("[MEM] Read  %x from %x", mem[addr & 8'hffff], addr));
-			data_out_r <= mem[addr & 8'hffff];
+			`debug_print(("[MEM] Read  %x from %x", mem[addr & 16'hffff], addr));
+			data_out_r <= mem[addr & 16'hffff];
 			last_addr <= addr;
 			ready_r <= 1;
 		end else begin
@@ -36,7 +36,7 @@ module memory(
 			if (memory_write_en) begin
 				last_addr <= 1'bz;
 				`debug_print(("[MEM] Wrote %x to   %x", data_in, addr));
-				mem[addr & 8'hffff] <= data_in;
+				mem[addr & 16'hffff] <= data_in;
 			end
 		end
 	end
