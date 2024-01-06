@@ -26,6 +26,15 @@ module cpu(
 	reg [7:0]  ready_operands;
 	reg [63:0] _operand [1:0];
 
+	reg [31:0] pc_for_call;
+	reg [2:0] substate;
+	reg call_is_import;
+	reg call_is_service;
+
+	// sub-states for CALL CALC_OPERANDS
+	localparam PREP_OPERAND_COUNT 	= 0;
+	localparam LOAD_NEW_PC 			= 1;
+
 	reg exec_done;
 
 	reg [7:0]  op_stack_top;
@@ -106,7 +115,7 @@ module cpu(
 				END_OF_FUNC, LOCAL_SET, I32_CONST, UNREACHABLE: begin
 					operands_for_instr = 0;
 				end
-				DROP, LOCAL_SET: begin
+				DROP, LOCAL_GET: begin
 					operands_for_instr = 1;
 				end
 				I32_ADD, I32_MUL: begin
@@ -143,6 +152,7 @@ module cpu(
 					call_stack_top <= call_stack_top + 1;
 					memory_write_en_r <= 1;
 					data_in_r <= pc;
+					pc <= pc_for_call;
 				end
 				DROP: begin
 					`dp(("[E] call %x", instr_imm));
@@ -218,6 +228,7 @@ module cpu(
 						memory_read_en_r <= 0;
 						ready_operands <= 0;
 						state <= instruction == CALL ? STATE_CALC_OPERANDS : STATE_LOAD_REG;
+						substate <= 0;
 					end
 				end else begin
 					addr_r <= pc;
@@ -226,15 +237,33 @@ module cpu(
 			end
 			STATE_CALC_OPERANDS: begin
 				// CALL requires TYPE_TABLE[instr_imm] operands
-				if(memory_ready) begin
-					`dp(("Call requires %x ops", data_out >> 2));
-					needed_operands <= data_out >> 2;
-					state <= STATE_LOAD_REG;
-					memory_read_en_r <= 0;
-				end else begin
-					addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5); // FIXME base lookup
-					memory_read_en_r <= 1;
-				end
+				case(substate)
+					PREP_OPERAND_COUNT: begin
+						if(!memory_ready) begin
+							// FIXME base lookup
+							addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5) + 4;
+							memory_read_en_r <= 1;
+						end else begin
+							`dp(("Call requires %x ops", data_out >> 2));
+							// per BOOT.md
+							call_is_import = data_out[1];
+							call_is_service = data_out[0];
+
+							needed_operands <= data_out >> 2;
+							substate <= LOAD_NEW_PC;
+							// here reading 1 byte before AKA LSB for addr
+							addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5) + 3;
+						end
+					end
+					LOAD_NEW_PC: begin
+						// FIXME need 4 bytes
+						// FIXME base lookup
+						pc_for_call <= data_out;
+						`dp(("[E] call jmp into %x", data_out));
+						state <= STATE_LOAD_REG;
+						memory_read_en_r <= 0;
+					end
+				endcase
 			end
 			STATE_LOAD_REG: begin
 				if(needed_operands == 0) begin

@@ -224,7 +224,7 @@ task handle_section(); begin
 						//
 						// In this section we only know the value of the last
 						// byte
-						mem_addr_r <= FUNCTION_TABLE_BASE + (func_idx * 5);
+						mem_addr_r <= FUNCTION_TABLE_BASE + (func_idx * 5) + 4;
 						// by virtue of being in SECTION_FUCTION is-import and
 						// is-service _must_ be 0, as these are locally
 						// defined functions
