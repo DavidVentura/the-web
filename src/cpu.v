@@ -134,6 +134,7 @@ module cpu(
 	task handle_instruction;
 		begin
 			`dp(("[E] pc=%x", pc));
+			// stack args were already popped into _operand
 			case(instruction)
 				I32_CONST: begin
 					`dp(("[E] i32.const %x", instr_imm));
@@ -144,10 +145,10 @@ module cpu(
 				end
 				I32_ADD: begin
 					`dp(("[E] i32.add %x %x", _operand[0], _operand[1]));
-					addr_r <= op_stack_top - 1;
+					addr_r <= op_stack_top;
 					memory_write_en_r <= 1;
 					data_in_r <= _operand[0] + _operand[1];
-					op_stack_top <= op_stack_top - 1;
+					op_stack_top <= op_stack_top + 1;
 				end
 				CALL: begin
 					`dp(("[E] call %x", instr_imm));
@@ -159,7 +160,7 @@ module cpu(
 					`dp(("[E] new PC %x", pc_for_call));
 				end
 				DROP: begin
-					`dp(("[E] call %x", instr_imm));
+					`dp(("[E] DROP %x", instr_imm));
 					op_stack_top <= op_stack_top - 1;
 				end
 				LOCAL_GET: begin
@@ -304,7 +305,7 @@ module cpu(
 					memory_read_en_r <= 0;
 				end else begin
 					if (memory_ready) begin
-						`dp(("Fetghing operand into reg from stack"));
+						`dp(("Fetching operand into reg from stack"));
 						_operand[needed_operands-ready_operands-1] <= data_out;
 						ready_operands <= ready_operands + 1; 
 						addr_r <= op_stack_top - (ready_operands+1) - 1;
@@ -312,6 +313,7 @@ module cpu(
 							op_stack_top <= op_stack_top - needed_operands;
 							memory_read_en_r <= 0;
 							state <= STATE_EXECUTE;
+							`dp(("Will execute, stack top at %x", op_stack_top - needed_operands));
 						end
 					end else begin
 						addr_r <= op_stack_top - ready_operands - 1;
