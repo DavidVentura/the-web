@@ -15,6 +15,7 @@ module cpu(
 );
 	`define dp(statement) `ifdef DEBUG $display``statement `endif
 	`define die(statement) `ifdef DEBUG $display``statement; $finish; `endif
+	`include "src/platform.v"
 
 	reg [3:0]  state;
 	reg [31:0] pc;
@@ -224,10 +225,16 @@ module cpu(
 				end
 			end
 			STATE_CALC_OPERANDS: begin
-				// CALL requires $instr_imm operands
-				needed_operands <= instr_imm;
-				state <= STATE_LOAD_REG;
-				memory_read_en_r <= 0;
+				// CALL requires TYPE_TABLE[instr_imm] operands
+				if(memory_ready) begin
+					`dp(("Call requires %x ops", data_out >> 2));
+					needed_operands <= data_out >> 2;
+					state <= STATE_LOAD_REG;
+					memory_read_en_r <= 0;
+				end else begin
+					addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5); // FIXME base lookup
+					memory_read_en_r <= 1;
+				end
 			end
 			STATE_LOAD_REG: begin
 				if(needed_operands == 0) begin
