@@ -14,7 +14,7 @@ module rom(
 	reg ready_r = 0;
 	assign ready = ready_r;
 	assign data_out = data_out_r;
-	reg [127:0] testname;
+	reg [255:0] testname;
 	
 	initial begin
 		if ($value$plusargs("TESTNAME=%s", testname)) begin
