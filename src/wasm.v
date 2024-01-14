@@ -17,6 +17,7 @@ module wasm(
 );
 
 `define debug_print(statement) `ifdef DEBUG $display``statement `endif
+`define debug2_print(statement) `ifdef DEBUG2 $display``statement `endif
 localparam SECTION_HALT 	= 0;
 localparam SECTION_TYPE 	= 1;
 localparam SECTION_IMPORT 	= 2;
@@ -131,6 +132,149 @@ task read_leb128();
 	end
 endtask
 
+reg [7:0] import_count = 0;
+reg [7:0] import_cur_idx;
+reg [0:63] platform_string = "platform";
+
+reg [7:0] import_cur_mod_name_len;
+reg [7:0] import_cur_mod_name_idx;
+
+reg import_cur_mod_is_platform;
+
+reg [7:0] import_cur_func_name_len;
+reg [7:0] import_cur_func_name_idx;
+
+reg [7:0] import_cur_func_match; // bitmap
+/*
+* 10, 0, "uart_write"
+* 09, 1, "uart_read"
+*/
+//  16  b wide             8 entries
+reg [0:8*16*8] rom_mapping;
+initial begin
+	rom_mapping[0*8+:8] = 10; // len
+	rom_mapping[1*8+:8] = 1; // argc
+	rom_mapping[2*8+:10*8] = "uart_write";
+
+	// 17 byte per entry? faster lookup
+	rom_mapping[18*8+:8] = 9; // len
+	rom_mapping[19*8+:8] = 0; // argc
+	rom_mapping[20*8+:9*8] = "uart_read";
+	// TODO move/set entire mem
+end
+integer i;
+task handle_import(); begin
+	if (substate == IMPORT_READ_DONE || leb_done) begin
+		case(substate)
+			IMPORT_READ_COUNT: begin
+				import_count <= _leb128;
+				import_cur_idx <= 0;
+				substate <= IMPORT_READ_MODULE_NAME_LEN;
+			end
+			// vv Repeat #import count
+			IMPORT_READ_MODULE_NAME_LEN: begin
+				import_cur_mod_name_len <= _leb128;
+				import_cur_mod_name_idx <= 0;
+				substate <= IMPORT_READ_MODULE_NAME;
+				import_cur_mod_is_platform <= 1;
+				`debug_print(("Module has len %d, ==platform? %d", _leb128, _leb128 == 8));
+			end
+			IMPORT_READ_MODULE_NAME: begin
+				`debug2_print(("Module name %d = %c, matched? %d, still platform? %d",
+							  import_cur_mod_name_idx,
+							  _leb128,
+							  platform_string[(import_cur_mod_name_idx*8)+:8] == _leb128,
+							  (import_cur_mod_is_platform && platform_string[(import_cur_mod_name_idx*8)+:8] == _leb128)));
+				import_cur_mod_is_platform <= import_cur_mod_is_platform && platform_string[(import_cur_mod_name_idx*8)+:8] == _leb128;
+				import_cur_mod_name_idx <= import_cur_mod_name_idx + 1;
+				if ((import_cur_mod_name_idx + 1) == import_cur_mod_name_len) begin
+					import_cur_func_match <= 8'hff;
+					substate <= IMPORT_READ_NAME_LEN;
+				end
+
+			end
+			IMPORT_READ_NAME_LEN: begin
+				import_cur_func_name_len <= _leb128;
+				import_cur_func_name_idx <= 0;
+				substate <= IMPORT_READ_NAME;
+				for(i=0; i<8; i=i+1) begin
+					if(rom_mapping[i*18*8+:8] !== _leb128) begin
+						import_cur_func_match[i] <= 0;
+						`debug_print(("Entry at %h (=%h) did not match import len (%h)", i, rom_mapping[i*18*8+:8], _leb128));
+					end else begin
+						`debug_print(("Entry at %h (=%h) matched import len (%h)", i, rom_mapping[i*18*8+:8], _leb128));
+					end
+				end
+			end
+			IMPORT_READ_NAME: begin
+				`debug_print(("maybe matches %b", import_cur_func_match));
+				import_cur_func_name_idx <= import_cur_func_name_idx + 1;
+				if ((import_cur_func_name_idx + 1) == import_cur_func_name_len) begin
+					substate <= IMPORT_READ_TYPE_ID;
+				end
+
+				`debug_print(("Entry at %h = %c", import_cur_func_name_idx, _leb128));
+				for(i=0; i<8; i=i+1) begin
+					if(rom_mapping[(i*18+import_cur_func_name_idx+2)*8+:8] !== _leb128) begin
+						import_cur_func_match[i] <= 0;
+						`debug_print(("Entry at %h (=%h), byte %d, did not match import letter",
+									  i,
+									  //rom_mapping[(i*18+import_cur_func_name_idx+2)*8+:8],
+									  rom_mapping[(i*18+import_cur_func_name_idx+2)*8+:8],
+									  (i*18+import_cur_func_name_idx+2)
+								  ));
+					end else begin
+						`debug_print(("Entry at %h matched import letter", i));
+					end
+				end
+
+				if ((import_cur_func_name_idx + 1) == import_cur_func_name_len) begin
+					substate <= IMPORT_READ_TYPE_ID;
+				end
+			end
+			IMPORT_READ_TYPE_ID: begin
+				`debug_print(("type id is %h", _leb128));
+				substate <= IMPORT_READ_TYPE_INDEX;
+			end
+			IMPORT_READ_TYPE_INDEX: begin
+				`debug_print(("type index is %h", _leb128));
+				substate <= IMPORT_READ_DONE;
+			end
+			IMPORT_READ_DONE: begin
+				// ft[idx] = {.func_idx=X, .imported=1, .service=1}
+				import_cur_idx <= import_cur_idx + 1;
+				mem_write_en_r <= 1;
+				// We are writing a function table entry, per BOOT.md:
+				// union [4 bytes address | 4 bytes builtin func id]
+				// 1 byte of:
+				// 	arg count (6) bits
+				// 	is-import (1 bit)
+				// 	is-service (1-bit)
+				//
+				// In this section we only know the value of the last
+				// byte
+				mem_addr_r <= FUNCTION_TABLE_BASE + (import_cur_idx * 5) + 4;
+				// by virtue of being an IMPORT, is-import and
+				// is-service _must_ be 1
+				// TODO: actually write the argc
+				// TODO: actually write the id
+				mem_data_in_r <= ((1'b1 & 6'b111111) << 2) | 2'b11;
+				if((import_cur_idx +1) == import_count) begin
+					state <= S_PRE_READ_SECTION;
+					section <= SECTION_HALT;
+				end else begin
+					substate <= IMPORT_READ_MODULE_NAME_LEN;
+					import_cur_idx <= import_cur_idx + 1;
+				end
+			end
+		endcase
+
+	end else begin // !leb_done
+		read_leb128();
+	end
+end
+endtask
+
 reg [7:0] type_count;
 reg [7:0] type_cur_idx;
 reg [7:0] type_arg_count;
@@ -143,6 +287,7 @@ reg [7:0] type_ret_cur_idx;
 reg [3:0] _type_arg_count [0:15];
 
 reg [3:0] func_idx;
+
 task handle_section(); begin
 	case(section)
 		SECTION_TYPE: begin
@@ -216,37 +361,14 @@ task handle_section(); begin
 			end
 		end
 		SECTION_IMPORT: begin
-			if (leb_done) begin
-				case(substate)
-					IMPORT_READ_COUNT: begin
-					end
-					// vv Repeat #import count
-					IMPORT_READ_MODULE_NAME_LEN: begin
-					end
-					IMPORT_READ_MODULE_NAME: begin
-					end
-					IMPORT_READ_NAME_LEN: begin
-					end
-					IMPORT_READ_NAME: begin
-					end
-					IMPORT_READ_TYPE_ID: begin
-					end
-					IMPORT_READ_TYPE_INDEX: begin
-					end
-					IMPORT_READ_DONE: begin
-					end
-				endcase
-
-			end else begin // !leb_done
-				read_leb128();
-			end
+			handle_import();
 		end
 		SECTION_FUNCTION: begin
 			if (leb_done) begin
 				case(substate)
 					FUNCTION_READ_COUNT: begin
 						func_count <= _leb128;
-						func_idx <= 0;
+						func_idx <= 0; // TODO must be imported_func_count
 						substate <= FUNCTION_READ_TYPE;
 					end
 					FUNCTION_READ_TYPE: begin
@@ -261,14 +383,14 @@ task handle_section(); begin
 						//
 						// In this section we only know the value of the last
 						// byte
-						mem_addr_r <= FUNCTION_TABLE_BASE + (func_idx * 5) + 4;
+						mem_addr_r <= FUNCTION_TABLE_BASE + ((func_idx+import_count) * 5) + 4;
 						// by virtue of being in SECTION_FUCTION is-import and
 						// is-service _must_ be 0, as these are locally
 						// defined functions
 						// The 6 bits of argc are shifted 2 to the left as 
 						// the bottom two bits are [is-import,is-service]
 						// which are [0,0]
-						mem_data_in_r <= ((_type_arg_count[func_idx] & 6'b111111) << 2);
+						mem_data_in_r <= ((_type_arg_count[func_idx+import_count] & 6'b111111) << 2);
 						if ((func_idx + 1) == func_count) begin
 							state <= S_PRE_READ_SECTION;
 							section <= SECTION_HALT;
@@ -308,7 +430,7 @@ task handle_section(); begin
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
-						read_func <= 0;
+						read_func <= 0; // TODO must be imported_func_count
 						substate <= READ_FUNC_LEN;
 						`debug_print(("There are %x functions", _leb128));
 					end
@@ -346,7 +468,7 @@ task handle_section(); begin
 							substate <= READ_CODE;
 						end else begin
 							mem_write_en_r <= 1;
-							mem_addr_r <= FUNCTION_TABLE_BASE + (read_func * 5) + 3 - fte_addr_b;
+							mem_addr_r <= FUNCTION_TABLE_BASE + ((read_func + import_count) * 5) + 3 - fte_addr_b;
 							mem_data_in_r <= code_block_base[(8*fte_addr_b)+:8];
 							fte_addr_b <= fte_addr_b + 1;
 							`debug_print(("Writing byte #%x into FTE", fte_addr_b));
@@ -363,7 +485,7 @@ task handle_section(); begin
 
 						// TODO: `-2` means "no local blocks" which is not
 						// correct
-						if((read_func == pc_func_id) && first_instruction_r == 0) begin
+						if(((read_func + import_count) == pc_func_id) && first_instruction_r == 0) begin
 							`debug_print(("Starting to read code for START function"));
 							first_instruction_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
 						end
@@ -391,6 +513,7 @@ task handle_section(); begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
+						// TODO must be read_func-imported_func_count
 						if ((read_func + 1) < func_count) begin
 							`debug_print(("Done reading function"));
 							`debug_print(("Next func starts at %x", code_block_base));
