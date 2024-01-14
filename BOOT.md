@@ -53,8 +53,8 @@ List of function-table-entry, index into table = function index
 #### Function table entry
 
 Packed:
-* Virtual Address = 32 bits
-* Arg count = 7 bits
+* Union [Virtual Address = 32 bits, service_call_id = 32 bits]
+* Arg count = 6 bits
 * Is import = 1 bit
 
 

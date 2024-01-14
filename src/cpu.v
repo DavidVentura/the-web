@@ -151,13 +151,18 @@ module cpu(
 					op_stack_top <= op_stack_top + 1;
 				end
 				CALL: begin
-					`dp(("[E] call %x", instr_imm));
-					addr_r <= call_stack_top;
-					call_stack_top <= call_stack_top + 1;
-					memory_write_en_r <= 1;
-					data_in_r <= pc;
-					pc <= pc_for_call;
-					`dp(("[E] new PC %x", pc_for_call));
+					`dp(("[E] call %x, import %b", instr_imm, call_is_import));
+					if(call_is_import==1) begin
+						`dp(("[E] Builtin call to func %h", instr_imm));
+					end else begin
+						addr_r <= call_stack_top;
+						call_stack_top <= call_stack_top + 1;
+						memory_write_en_r <= 1;
+						data_in_r <= pc;
+						pc <= pc_for_call;
+						`dp(("[E] new PC %x", pc_for_call));
+						exec_done <= 1;
+					end
 				end
 				DROP: begin
 					`dp(("[E] DROP %x", instr_imm));
@@ -195,7 +200,7 @@ module cpu(
 					`die(("No idea how to exec instruction %x", instruction));
 				end
 			endcase
-			if (instruction != END_OF_FUNC) begin
+			if (instruction != END_OF_FUNC && instruction != CALL) begin
 				exec_done <= 1;
 			end
 		end
@@ -276,7 +281,7 @@ module cpu(
 							addr_r <= FUNCTION_TABLE_BASE + (instr_imm * 5) + 4;
 							memory_read_en_r <= 1;
 						end else begin
-							`dp(("Call requires %x ops", data_out >> 2));
+							`dp(("Call requires %x ops, import? %b", data_out >> 2, data_out[0]));
 							// per BOOT.md
 							call_is_import = data_out[1];
 							call_is_service = data_out[0];
