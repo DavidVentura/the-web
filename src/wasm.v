@@ -368,7 +368,7 @@ task handle_section(); begin
 				case(substate)
 					FUNCTION_READ_COUNT: begin
 						func_count <= _leb128;
-						func_idx <= 0; // TODO must be imported_func_count
+						func_idx <= 0;
 						substate <= FUNCTION_READ_TYPE;
 					end
 					FUNCTION_READ_TYPE: begin
@@ -430,7 +430,7 @@ task handle_section(); begin
 				case(substate)
 					READ_FUNC_COUNT: begin
 						func_count <= _leb128;
-						read_func <= 0; // TODO must be imported_func_count
+						read_func <= 0;
 						substate <= READ_FUNC_LEN;
 						`debug_print(("There are %x functions", _leb128));
 					end
@@ -513,7 +513,6 @@ task handle_section(); begin
 					FINISH_FUNC: begin
 						mem_write_en_r <= 0;
 						read_func <= read_func + 1;
-						// TODO must be read_func-imported_func_count
 						if ((read_func + 1) < func_count) begin
 							`debug_print(("Done reading function"));
 							`debug_print(("Next func starts at %x", code_block_base));
