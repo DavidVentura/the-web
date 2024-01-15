@@ -49,6 +49,59 @@ Examples:
 
 These imports allow for operations like I/O device access (`uart_write`) and process management (`context_switch`).
 
+## In action
+
+Summarized/annotated output from running a test in simulation with `iverilog`:
+
+```
+[CPU] starting                          
+[MEM] Read  41 from 00000040            
+[MEM] Read  0a from 00000041            
+[E] i32.const 0xa                       
+[MEM] Wrote 0a to   000000aa            
+[MEM] Read  41 from 00000042            
+[MEM] Read  14 from 00000043            
+[E] i32.const 0x14                      
+[MEM] Wrote 14 to   000000ab            
+[MEM] Read  10 from 00000044            ; read CALL operand
+[MEM] Read  00 from 00000045            ; immediate (function index) is 0 
+[MEM] Read  08 from 00000604            ; read Function Table[0].flags (0x80 = 2 arguments)
+[MEM] Read  30 from 00000603            ; read Function Table[0].address
+[E] call jmp into 30                    
+Fetching operand into reg from stack    ; fetch first argument from stack into register
+[MEM] Read  14 from 000000ab            
+Fetching operand into reg from stack    ; fetch second argument from stack into register
+[MEM] Read  0a from 000000aa            
+[E] pc=00000046                         
+[E] call 0x0
+[E] new PC 00000030                     ; new PC is 0x30, from 0x46 
+[MEM] Wrote 46 to   00000055            ; store 0x46 in the callstack
+[MEM] Read  20 from 00000030            
+[MEM] Read  00 from 00000031            
+[E] local_get #0x0 = 0xa                ; write value from the call-register into operand-stack
+[MEM] Wrote 0a to   000000aa            
+[MEM] Read  20 from 00000032            
+[MEM] Read  01 from 00000033            
+[E] local_get #0x1 = 0x14               ; write value from the call-register into operand-stack
+[MEM] Wrote 14 to   000000ab            
+[MEM] Read  6a from 00000034            
+Fetching operand into reg from stack    
+[MEM] Read  14 from 000000ab            
+Fetching operand into reg from stack    
+[MEM] Read  0a from 000000aa            
+[E] i32.add 0xa 0x14                    ; execute add, consuming 2 elements on the stack and pushing a new one 
+[MEM] Wrote 1e to   000000aa            
+[MEM] Read  0b from 00000035            
+[MEM] Read  46 from 00000055            
+[E] EOB (RET) to 46                     ; implicit return from function call
+[MEM] Read  1a from 00000046            
+Fetching operand into reg from stack    
+[MEM] Read  1e from 000000aa            
+[E] DROP                                ; drop result from function call
+[MEM] Read  0b from 00000047            
+[E] pc=00000048                         
+[E] EOF end of program                  ; implicit return from main function; call stack empty; finish program
+```
 ## Links
 
 - [Spec](https://www.w3.org/TR/wasm-core-1/#binary-codesec)
