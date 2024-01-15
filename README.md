@@ -53,6 +53,23 @@ These imports allow for operations like I/O device access (`uart_write`) and pro
 
 Summarized/annotated output from running a test in simulation with `iverilog`:
 
+The program:
+```wat
+(module
+  (func $add (param $lhs i32) (param $rhs i32) (result i32)
+    local.get $lhs
+    local.get $rhs
+    i32.add)
+  (func $main
+	i32.const 10
+	i32.const 20
+	call $add
+	drop)
+  (start $main)
+)
+```
+
+The output:
 ```
 [CPU] starting                          
 [MEM] Read  41 from 00000040            
