@@ -45,7 +45,7 @@ def parse_expects(p: Path) -> dict:
     for line in p.open().readlines():
         if not line.startswith(';;'):
             continue
-        k, v = line[2:].split()
+        k, v = line[2:].strip().split()
         ret[k] = v
     return ret
 
