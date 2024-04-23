@@ -9,7 +9,8 @@
 	i32.const 10
 	i32.const 20
 	call $add
-	drop)
+	unreachable
+	)
   (start $main)
 )
 

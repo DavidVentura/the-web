@@ -1,3 +1,5 @@
+;;STACK_DEPTH 1
+;;TOP_OF_STACK 0x1e
 (module
   (func $add (param $lhs i32) (param $rhs i32) (result i32)
 	(local $a i32)
@@ -20,6 +22,6 @@
 	i32.const 10
 	i32.const 20
 	call $add
-	drop)
+	unreachable)
   (start $main)
 )
