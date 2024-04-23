@@ -94,8 +94,11 @@ module cpu_tb;
 	reg [31:0] pc;
 	reg [7:0] stack_depth;
 	reg [7:0] value_tos;
+	reg [255:0] vcd_file;
 	initial begin
-	  $dumpfile("test.vcd");
+	  if($value$plusargs("VCD=%s", vcd_file)) begin
+		  $dumpfile(vcd_file);
+	  end
 	  $dumpvars(0, cpu_tb);
 
 	  @(posedge rom_mapped);
