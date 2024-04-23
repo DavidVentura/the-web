@@ -11,7 +11,9 @@ module cpu(
 
 	// wasm parser
 	input  rom_mapped,
-	input  [31:0] first_instruction
+	input  [31:0] first_instruction,
+	// test
+	output [7:0] stack_top
 );
 	`define dp(statement) `ifdef DEBUG $display``statement `endif
 	`define die(statement) `ifdef DEBUG $display``statement; $finish; `endif
@@ -43,9 +45,10 @@ module cpu(
 	reg [7:0]  call_stack_top;
 	reg [7:0]  breaking_block;
 	// DEBUG
-	wire [7:0] _op_stack_top;
+	//wire [7:0] _op_stack_top;
 	wire [7:0] _call_stack_top;
-	assign _op_stack_top = op_stack_top;
+	//assign _op_stack_top = op_stack_top;
+	assign stack_top = op_stack_top;
 	assign _call_stack_top = call_stack_top;
 	wire [63:0] operand1 = _operand[0];
 	wire [63:0] operand2 = _operand[1];
@@ -78,6 +81,7 @@ module cpu(
 	localparam BREAK 		= 8'h0C;
 	localparam BLOCK 		= 8'h02;
 	localparam I32_CONST 	= 8'h41;
+	localparam I32_GE 		= 8'h4F;
 	localparam CALL 		= 8'h10;
 	localparam DROP 		= 8'h1A;
 	localparam END_OF_FUNC 	= 8'h0B;
@@ -125,11 +129,11 @@ module cpu(
 				DROP: begin
 					operands_for_instr = 1;
 				end
-				I32_ADD, I32_MUL: begin
+				I32_ADD, I32_MUL, I32_GE: begin
 					operands_for_instr = 2;
 				end
 				default: begin
-					`die(("No idea how many operands for %x", inst));
+					`die(("ERROR No idea how many operands for %x", inst));
 				end
 			endcase
 		end
@@ -161,6 +165,13 @@ module cpu(
 					addr_r <= op_stack_top;
 					memory_write_en_r <= 1;
 					data_in_r <= instr_imm;
+				end
+				I32_GE: begin
+					`dp(("[E] i32.ge %x %x", _operand[0], _operand[1]));
+					addr_r <= op_stack_top;
+					memory_write_en_r <= 1;
+					data_in_r <= _operand[0] >= _operand[1];
+					op_stack_top <= op_stack_top + 1;
 				end
 				I32_ADD: begin
 					`dp(("[E] i32.add %x %x", _operand[0], _operand[1]));
@@ -216,7 +227,7 @@ module cpu(
 					state <= STATE_HALT;
 				end
 				default: begin
-					`die(("No idea how to exec instruction %x", instruction));
+					`die(("ERROR No idea how to exec instruction %x", instruction));
 				end
 			endcase
 			if (instruction != END_OF_FUNC && instruction != CALL) begin
@@ -347,9 +358,7 @@ module cpu(
 			end
 			STATE_BREAKING_BLOCK: begin
 				if (memory_ready) begin
-					`dp(("Data out %x", data_out));
 					if (data_out == END_OF_FUNC) begin
-						`dp(("eof, bb %x", breaking_block));
 						if (breaking_block == 1) begin
 							state <= STATE_FETCH;
 							memory_read_en_r <= 0;
