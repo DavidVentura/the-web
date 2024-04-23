@@ -1,5 +1,3 @@
-
-
 ## Overview
 This is a learning project to create a CPU based on the WebAssembly (WASM) instruction set. An important goal for the project is being able to execute bytecode 
 without any modification passes.
@@ -118,6 +116,26 @@ Fetching operand into reg from stack
 [MEM] Read  0b from 00000047            
 [E] pc=00000048                         
 [E] EOF end of program                  ; implicit return from main function; call stack empty; finish program
+```
+
+## Testing
+
+Placing a `.wat` file in `programs/wat` will get it executed during the test runs.
+
+The depth of the stack and value at top-of-stack must be provided to verify execution, as an example:
+
+```wat
+;;STACK_DEPTH 1
+;;TOP_OF_STACK 0x1e
+(module
+  (func $main
+	i32.const 10
+	i32.const 20
+	i32.add
+	unreachable
+  )
+  (start $main)
+)
 ```
 ## Links
 
