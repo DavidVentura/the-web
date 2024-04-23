@@ -1,3 +1,5 @@
+;; STACK_DEPTH 1
+;; TOP_OF_STACK 0x1e
 (module
   (func $add2 (param $lhs i32) (param $rhs i32) (result i32)
     local.get $lhs
