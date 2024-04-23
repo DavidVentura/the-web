@@ -65,7 +65,7 @@ module cpu_tb;
 	assign memory_read_en = memory_read_en_r;
 	assign mem_addr = mem_addr_r;
 
-	reg [2:0] mem_access_r;
+	reg [2:0] mem_access_r = 2'bz;
 	wire [2:0] mem_access;
 	reg cpu_done = 0;
 
