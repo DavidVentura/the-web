@@ -109,7 +109,7 @@ module cpu_tb;
 		  $finish;
 	  end
 
-	  #300;
+	  #400;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
