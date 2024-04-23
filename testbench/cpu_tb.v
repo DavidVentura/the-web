@@ -57,6 +57,8 @@ module cpu_tb;
 	wire rom_mapped;
 	wire [31:0] first_instruction;
 
+	wire [7:0] stack_top;
+
 	reg [31:0] mem_addr_r = 32'bz;
 	reg memory_read_en_r = 1'bz;
 
@@ -79,7 +81,7 @@ module cpu_tb;
 	wire wasm_mem_access = mem_access == 0;
 	wire cpu_mem_access = mem_access == 1;
 
-	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction);
+	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction, stack_top);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
 	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, wasm_mem_access, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
@@ -90,6 +92,8 @@ module cpu_tb;
 	end
 
 	reg [31:0] pc;
+	reg [7:0] stack_depth;
+	reg [7:0] value_tos;
 	initial begin
 	  $dumpfile("test.vcd");
 	  $dumpvars(0, cpu_tb);
@@ -109,12 +113,29 @@ module cpu_tb;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
-	  // TODO: base-of-stack, not top-of-stack
-	  mem_addr_r <= OP_STACK_TOP;
+	  if($value$plusargs("STACK_DEPTH=%x", stack_depth)) begin
+		  stack_depth = stack_depth + OP_STACK_TOP;
+		  $display("[%s]: Expected stack depth at 0x%X, got 0x%X", (stack_depth != stack_top) ? "ERROR" : "OK", stack_depth, stack_top);
+		  if (stack_depth != stack_top) begin
+			  $finish;
+		  end
+	  end else begin
+		  $display("ERROR Did not get STACK_DEPTH passed");
+		  $finish;
+	  end
+	  mem_addr_r <= stack_depth-1;
 	  memory_read_en_r <= 1;
 	  @(posedge mem_ready);
-	  $display("[%s] ADD expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
 
+	  if($value$plusargs("TOP_OF_STACK=%x", value_tos)) begin
+		  $display("[%s] Value at top-of-stack expected 0x%X got 0x%X", (mem_data_out !== value_tos) ? "ERROR": "OK", value_tos, mem_data_out);
+		  if (stack_depth != stack_top) begin
+			  $finish;
+		  end
+	  end else begin
+		  $display("ERROR Did not get TOP_OF_STACK passed");
+		  $finish;
+	  end
 	  memory_read_en_r <= 0;
 	  @(posedge clk);
 	  memory_read_en_r <= 1;
