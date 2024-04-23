@@ -39,6 +39,7 @@ module rom(
 endmodule
 
 module cpu_tb;
+	`include "src/platform.v"
 	reg clk = 0;
 	always #1 clk <= ~clk;
 	wire [31:0] mem_addr;
@@ -108,7 +109,8 @@ module cpu_tb;
 	  cpu_done <= 1;
 	  @(posedge clk);
 
-	  mem_addr_r <= 8'hAA;
+	  // TODO: base-of-stack, not top-of-stack
+	  mem_addr_r <= OP_STACK_TOP;
 	  memory_read_en_r <= 1;
 	  @(posedge mem_ready);
 	  $display("[%s] ADD expected 0x1e, got 0x%X", (mem_data_out !== 8'h1E) ? "ERROR": "OK", mem_data_out);
