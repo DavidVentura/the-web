@@ -73,7 +73,8 @@ def test(tmp_path, program: Path):
     mem_file = tmp_path / f"m_{program.name}"
     with mem_file.open('w') as fd:
         fd.write('\n'.join(mem))
-    cmd = ['./a.out', f'+TESTNAME={mem_file.name}', '+PC=50'] + expects
+    here = Path(__file__).parent
+    cmd = ['./a.out', f'+VCD={here}/test.vcd', f'+TESTNAME={mem_file.name}', '+PC=50'] + expects
     p = subprocess.run(cmd, cwd=tmp_path, stdout=subprocess.PIPE, check=True)
     output = p.stdout.decode('utf-8')
     print(output)
