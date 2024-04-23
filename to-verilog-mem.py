@@ -3,8 +3,8 @@ import sys
 with open(sys.argv[1], "rb") as fd:
     data = fd.read()
 
-CODE_BASE = 0x30
-CODE_AT = 0x40
+CODE_BASE = 0x40
+CODE_AT = 0x50
 DEBUG = False
 
 def byte_line(n: int) -> str:

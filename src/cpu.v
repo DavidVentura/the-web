@@ -41,6 +41,7 @@ module cpu(
 
 	reg [7:0]  op_stack_top;
 	reg [7:0]  call_stack_top;
+	reg [7:0]  breaking_block;
 	// DEBUG
 	wire [7:0] _op_stack_top;
 	wire [7:0] _call_stack_top;
@@ -71,8 +72,11 @@ module cpu(
 	localparam STATE_LOAD_REG 				= 8;
 	localparam STATE_CALC_OPERANDS 			= 9;
 	localparam STATE_EXECUTE 				= 10;
-	localparam STATE_HALT 					= 11;
+	localparam STATE_BREAKING_BLOCK			= 11;
+	localparam STATE_HALT 					= 12;
 
+	localparam BREAK 		= 8'h0C;
+	localparam BLOCK 		= 8'h02;
 	localparam I32_CONST 	= 8'h41;
 	localparam CALL 		= 8'h10;
 	localparam DROP 		= 8'h1A;
@@ -91,13 +95,14 @@ module cpu(
 		needed_operands <= 0;
 		ready_operands <= 0;
 		exec_done <= 0;
-		op_stack_top <= 8'haa;
-		call_stack_top <= 8'h55;
+		breaking_block <= 0;
+		op_stack_top <= OP_STACK_TOP;
+		call_stack_top <= CALL_STACK_TOP;
 	end
 	function needs_immediate(input [7:0] inst);
 		begin
 			case(inst)
-				I32_CONST, CALL, LOCAL_GET, LOCAL_SET: begin
+				I32_CONST, CALL, LOCAL_GET, LOCAL_SET, BLOCK, BREAK: begin
 					needs_immediate = 1;
 				end
 			default: begin
@@ -114,7 +119,7 @@ module cpu(
 	function [2:0] operands_for_instr(input [7:0] inst);
 		begin
 			case(inst)
-				END_OF_FUNC, LOCAL_SET, LOCAL_GET, I32_CONST, UNREACHABLE: begin
+				END_OF_FUNC, LOCAL_SET, LOCAL_GET, I32_CONST, UNREACHABLE, BLOCK, BREAK: begin
 					operands_for_instr = 0;
 				end
 				DROP: begin
@@ -136,6 +141,20 @@ module cpu(
 			`dp(("[E] pc=%x", pc));
 			// stack args were already popped into _operand
 			case(instruction)
+				BREAK: begin
+					`dp(("[E] break, depth=%x", instr_imm));
+					breaking_block <= instr_imm + 1;
+					state <= STATE_BREAKING_BLOCK;
+				end
+				BLOCK: begin
+					`dp(("[E] block %x", instr_imm));
+					// imm = return type;
+					// 0x40 == nothing
+					// 0x7F = i32
+					// 0x7E = i64
+					// 0x7D = f32
+					// 0x7C = f64
+				end
 				I32_CONST: begin
 					`dp(("[E] i32.const %x", instr_imm));
 					op_stack_top <= op_stack_top + 1;
@@ -176,7 +195,7 @@ module cpu(
 					data_in_r <= _operand[instr_imm];
 				end
 				END_OF_FUNC: begin
-					if (call_stack_top == 8'h55) begin // TODO FIXME
+					if (call_stack_top == CALL_STACK_TOP) begin // TODO FIXME
 						end_of_prog = 1;
 						memory_read_en_r <= 0;
 						`dp(("[E] EOF end of program"));
@@ -324,6 +343,30 @@ module cpu(
 						addr_r <= op_stack_top - ready_operands - 1;
 						memory_read_en_r <= 1;
 					end
+				end
+			end
+			STATE_BREAKING_BLOCK: begin
+				if (memory_ready) begin
+					`dp(("Data out %x", data_out));
+					if (data_out == END_OF_FUNC) begin
+						`dp(("eof, bb %x", breaking_block));
+						if (breaking_block == 1) begin
+							state <= STATE_FETCH;
+							memory_read_en_r <= 0;
+							exec_done <= 0;
+						end
+						breaking_block <= breaking_block - 1;
+					end
+					if (data_out == BLOCK) begin
+						// balance out block/end pairs when entering
+						// a new block
+						breaking_block <= breaking_block + 1;
+					end
+					pc <= pc + 1;
+				end else begin
+					memory_write_en_r <= 0;
+					addr_r <= pc;
+					memory_read_en_r <= 1;
 				end
 			end
 			STATE_EXECUTE: begin

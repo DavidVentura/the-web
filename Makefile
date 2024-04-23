@@ -29,15 +29,26 @@ programs/01-adder/out: programs/01-adder/main.c Makefile
 	# -Wl,--export-all \
 	# -Wl,--lto-O3 \
 
+06-block.wasm: programs/wat/06-block.wat
+	wat2wasm programs/wat/06-block.wat
+mem_06_block.txt: 06-block.wasm Makefile to-verilog-mem.py
+	python3 to-verilog-mem.py 06-block.wasm $@ 256
+
+mem_05_call_imported.txt:
+	python3 to-verilog-mem.py 05-call-imported.wasm $@ 256
 mem_02_call.txt:
 	python3 to-verilog-mem.py 02-call.wasm $@ 256
 mem_01_adder.txt:
 	python3 to-verilog-mem.py 01-adder.wasm $@ 256
 
-test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt mem_02_call.txt
+test: src/cpu.v src/wasm.v src/memory.v src/control.v testbench/cpu_tb.v mem_01_adder.txt mem_02_call.txt mem_05_call_imported.txt
 	iverilog -DDEBUG=1 $(filter %.v,$^)
-	#./a.out +TESTNAME=mem_01_adder.txt +PC=30
-	./a.out +TESTNAME=mem_02_call.txt +PC=40
+	#./a.out +TESTNAME=mem_01_adder.txt +PC=40
+	#./a.out +TESTNAME=mem_02_call.txt +PC=40
+	#./a.out +TESTNAME=mem_05_call_imported.txt +PC=40
+	./a.out +TESTNAME=mem_06_block.txt +PC=40
+	# FIXME move this crap to python/pytest
+
 
 web.json: src/cpu.v src/wasm.v src/memory.v src/control.v
 	yosys -p "read_verilog $^; synth_gowin -top control -json $@" -e "Multiple conflicting drivers for"

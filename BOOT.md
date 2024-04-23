@@ -14,8 +14,10 @@ The first page is used to control the CPU
 * 0x10: Function table base
 * 0x18: Function table length
 * 0x20: Operand stack _top_
-* 0x28: Call stack _top_
-* 0x30: Code (until 0x500)
+  * Only allows 16 operands
+* 0x30: Call stack _top_
+  * Only allows 16 nested calls
+* 0x40: Code (until 0x500)
 
 ## State out of reset
 
