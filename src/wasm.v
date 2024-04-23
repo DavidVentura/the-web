@@ -100,9 +100,9 @@ reg [31:0] rom_addr_r = 'hz;
 assign rom_addr = rom_addr_r;
 
 // interface to mem
-reg [31:0] mem_addr_r;
-reg [7:0] mem_data_in_r;
-reg mem_write_en_r;
+reg [31:0] mem_addr_r = 'hz;
+reg [7:0] mem_data_in_r = 'hz;
+reg mem_write_en_r = 'hz;
 
 assign mem_write_en = mem_access ? mem_write_en_r : 'hz;
 assign mem_addr = mem_access ? mem_addr_r : 'hz;
@@ -113,7 +113,7 @@ reg rom_mapped_r = 0;
 assign rom_mapped = rom_mapped_r;
 
 reg [3:0] _leb_byte = 0;
-reg [31:0] _leb128;
+reg [31:0] _leb128 = 'hz;
 reg [7:0] pc_func_id = 'hz;
 
 task read_leb128();

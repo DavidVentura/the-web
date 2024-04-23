@@ -55,8 +55,8 @@ module cpu(
 
 	// /DEBUG
 
-	reg [31:0] addr_r;
-	reg [7:0] data_in_r;
+	reg [31:0] addr_r = 'hz;
+	reg [7:0] data_in_r = 'hz;
 	reg memory_read_en_r;
 	reg memory_write_en_r;
 
@@ -100,6 +100,8 @@ module cpu(
 		ready_operands <= 0;
 		exec_done <= 0;
 		breaking_block <= 0;
+		_operand[0] <= 0;
+		_operand[1] <= 0;
 		op_stack_top <= OP_STACK_TOP;
 		call_stack_top <= CALL_STACK_TOP;
 	end

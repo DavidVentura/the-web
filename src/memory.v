@@ -11,7 +11,7 @@ module memory(
 	// bram is 18kbit = 2250 byte = 0x8ca
 	// this consumes 2 blocks
 	reg [7:0] mem [0:2250*2];
-	reg [7:0] data_out_r;
+	reg [7:0] data_out_r = 'hz;
 
 	reg [31:0] last_addr = 0;
 
