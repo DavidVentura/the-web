@@ -6,7 +6,6 @@ import pytest
 
 CODE_BASE = 0x40
 CODE_AT = 0x50
-DEBUG = False
 SRC_FILES = list(str(p) for p in Path("src/").glob("*.v") if p.name != "platform.v")
 
 def byte_line(n: int) -> str:
@@ -33,8 +32,6 @@ def process_file(data: bytes, mem_size: int) -> list[str]:
 
     for b in data:
         ret.append(byte_line(b))
-        if DEBUG:
-            ret.append(f' {hex(b)}')
 
     needed_size = len(data) + CODE_AT
     delta = mem_size - needed_size
@@ -73,11 +70,14 @@ def test(tmp_path, program: Path):
     build_cmd = ["iverilog", "-DDEBUG=1", "-o", str(tmp_path / "a.out")] + SRC_FILES + ['testbench/cpu_tb.v']
     subprocess.check_call(build_cmd)
 
-    mem_file = tmp_path / f"mem_{program.name}.txt"
+    mem_file = tmp_path / f"m_{program.name}"
     with mem_file.open('w') as fd:
         fd.write('\n'.join(mem))
-    cmd = ['./a.out', f'+TESTNAME={mem_file.name}', '+PC=40'] + expects
+    cmd = ['./a.out', f'+TESTNAME={mem_file.name}', '+PC=50'] + expects
     p = subprocess.run(cmd, cwd=tmp_path, stdout=subprocess.PIPE, check=True)
-    if 'ERROR' in p.stdout.decode('utf-8'):
-        print(p.stdout.decode('utf-8'))
-        pytest.fail("Error in testcase")
+    output = p.stdout.decode('utf-8')
+    print(output)
+    if 'ERROR' in output:
+        #print(output)
+        line = [l for l in output.splitlines() if 'ERROR' in l]
+        pytest.fail(f"Error in testcase: {line}")

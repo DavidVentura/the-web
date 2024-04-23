@@ -1,7 +1,3 @@
-import sys
-
-with open(sys.argv[1], "rb") as fd:
-    data = fd.read()
 
 CODE_BASE = 0x40
 CODE_AT = 0x50
@@ -18,23 +14,34 @@ assert byte_line(0) == "00000000"
 assert byte_line(1) == "00000001"
 assert byte_line(0xFF) == "11111111"
 
-with open(sys.argv[2], "w") as fd:
-    for i in range(0, CODE_BASE):
-        fd.write('00000000\n')
+def process_file(fname, mem_size: int) -> list[str]:
+    ret = []
+    with open(fname, "rb") as fd:
+        data = fd.read()
 
-    fd.write(byte_line(CODE_AT) + '\n')
+    for _ in range(0, CODE_BASE):
+        ret.append('00000000')
 
-    for i in range(CODE_BASE+1, CODE_AT):
-        fd.write('00000000\n')
+    ret.append(byte_line(CODE_AT))
+
+    for _ in range(CODE_BASE+1, CODE_AT):
+        ret.append('00000000')
 
     for b in data:
-        fd.write(byte_line(b))
+        ret.append(byte_line(b))
         if DEBUG:
-            fd.write(f' {hex(b)}')
-        fd.write('\n')
+            ret.append(f' {hex(b)}')
+        ret.append('\n')
 
     needed_size = len(data) + CODE_AT
-    delta = int(sys.argv[3]) - needed_size
+    delta = mem_size - needed_size
     assert delta > 0, f"Need to populate at least {needed_size}"
-    for i in range(0, delta):
-        fd.write('00000000\n')
+    for _ in range(0, delta):
+        ret.append('00000000\n')
+    return ret
+
+if __name__ == "__main__":
+    import sys
+    data = process_file(sys.argv[1], int(sys.argv[3]))
+    with open(sys.argv[2], "w") as fd:
+        fd.write('\n'.join(data))
