@@ -67,12 +67,12 @@ module cpu_tb;
 
 	reg [2:0] mem_access_r = 2'bz;
 	wire [2:0] mem_access;
-	reg cpu_done = 0;
+	wire cpu_halted;
 
 	assign mem_access = mem_access_r;
 
 	always @(posedge clk) begin
-		if(cpu_done) begin
+		if(cpu_halted) begin
 			mem_access_r <= 2;
 		end else begin
 			mem_access_r <=	rom_mapped ? 1 : 0;
@@ -81,15 +81,18 @@ module cpu_tb;
 	wire wasm_mem_access = mem_access == 0;
 	wire cpu_mem_access = mem_access == 1;
 
-	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction, stack_top);
+	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction, stack_top, cpu_halted);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
 	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, wasm_mem_access, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
 
 	integer fd;
 	initial begin
-		#800 $finish;
+		#2000;
+		$display("[ERROR]: Timeout executing");
+		$finish;
 	end
+
 
 	reg [31:0] pc;
 	reg [7:0] stack_depth;
@@ -112,8 +115,7 @@ module cpu_tb;
 		  $finish;
 	  end
 
-	  #400;
-	  cpu_done <= 1;
+	  @(posedge cpu_halted);
 	  @(posedge clk);
 
 	  if($value$plusargs("STACK_DEPTH=%x", stack_depth)) begin
