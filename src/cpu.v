@@ -49,7 +49,7 @@ module cpu(
 	reg [7:0] breaking_block;
 	// DEBUG
 	//wire [7:0] _op_stack_top;
-	wire [7:0] _call_stack_top;
+	wire [12:0] _call_stack_top;
 	//assign _op_stack_top = op_stack_top;
 	assign stack_top = op_stack_top;
 	assign _call_stack_top = call_stack_top;
@@ -229,6 +229,7 @@ module cpu(
 					end
 				end
 				UNREACHABLE: begin
+					`dp(("[E] Executed `unreachable`, halting"));
 					state <= STATE_HALT;
 				end
 				default: begin
