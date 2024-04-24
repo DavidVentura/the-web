@@ -13,7 +13,8 @@ module cpu(
 	input  rom_mapped,
 	input  [31:0] first_instruction,
 	// test
-	output [7:0] stack_top
+	output [12:0] stack_top,
+	output halted
 );
 	`define dp(statement) `ifdef DEBUG $display``statement `endif
 	`define die(statement) `ifdef DEBUG $display``statement; $finish; `endif
@@ -40,10 +41,12 @@ module cpu(
 	localparam LOAD_NEW_PC 			= 1;
 
 	reg exec_done;
+	reg r_halted = 0;
+	assign halted = r_halted;
 
-	reg [7:0]  op_stack_top;
-	reg [7:0]  call_stack_top;
-	reg [7:0]  breaking_block;
+	reg [12:0] op_stack_top;
+	reg [7:0] call_stack_top;
+	reg [7:0] breaking_block;
 	// DEBUG
 	//wire [7:0] _op_stack_top;
 	wire [7:0] _call_stack_top;
@@ -392,6 +395,7 @@ module cpu(
 			end
 			STATE_HALT: begin
 				memory_read_en_r <= 'hz;
+				r_halted <= 1;
 				//addr_r <= 'hz;
 			end
 		endcase

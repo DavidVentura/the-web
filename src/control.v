@@ -29,10 +29,11 @@ module control(input clk, input rx_serial, output tx_serial, output rom_mapped, 
 	assign mem_access = rom_mapped ? 1 : 0;
 
 
-	wire [7:0] stack_top;
+	wire [12:0] stack_top;
+	wire cpu_halted;
 	// rom r(clk, rom_addr, rom_data_out, rom_read_en, rom_ready);
 	// HACK vv
-	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction, stack_top);
+	cpu c(clk, cpu_mem_access, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready, rom_mapped, first_instruction, stack_top, cpu_halted);
 	memory m(clk, mem_addr, mem_data_in, mem_data_out, memory_read_en, memory_write_en, mem_ready);
 	memory rom(clk, rom_addr, _rom_data_in, rom_data_out, rom_read_en, _rom_write_en, rom_ready);
 	wasm w(clk, rom_addr, rom_data_out, rom_read_en, rom_ready, wasm_mem_access, mem_addr, mem_data_in, memory_write_en, rom_mapped, first_instruction);
