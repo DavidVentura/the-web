@@ -5,8 +5,8 @@ module rom(
 	input read_en,
 	output ready
 );
-	// TODO: this caps out at 255
-	reg [7:0] mem [0:255];
+	// TODO: this caps out at 2048
+	reg [11:0] mem [0:2047];
 	reg [7:0] data_out_r;
 
 	reg [31:0] last_addr = 0;
@@ -28,8 +28,8 @@ module rom(
 
 	always @(posedge clk) begin
 		if (read_en && addr !== last_addr) begin
-			$display("[ROM] Read  %x from %x", mem[addr & 8'hff], addr);
-			data_out_r <= mem[addr & 8'hff];
+			$display("[ROM] Read  %x from %x", mem[addr & 12'hfff], addr);
+			data_out_r <= mem[addr & 12'hfff];
 			last_addr <= addr;
 			ready_r <= 1;
 		end else begin
@@ -57,7 +57,7 @@ module cpu_tb;
 	wire rom_mapped;
 	wire [31:0] first_instruction;
 
-	wire [7:0] stack_top;
+	wire [12:0] stack_top;
 
 	reg [31:0] mem_addr_r = 32'bz;
 	reg memory_read_en_r = 1'bz;
@@ -95,7 +95,7 @@ module cpu_tb;
 
 
 	reg [31:0] pc;
-	reg [7:0] stack_depth;
+	reg [12:0] stack_depth;
 	reg [7:0] value_tos;
 	reg [255:0] vcd_file;
 	initial begin
