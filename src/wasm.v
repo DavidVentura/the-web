@@ -445,21 +445,25 @@ task handle_section(); begin
 					READ_BLOCK_COUNT: begin
 						local_blocks <= _leb128;
 						`debug_print(("There are %x local blocks", _leb128));
+						read_local_blocks <= 0;
+						local_count <= 0;
 						substate <= (_leb128 == 0) ? POPULATE_FTE_ENTRY : READ_LOCAL_COUNT;
 					end
+
 					// vv Repeat #local_blocks
 					READ_LOCAL_COUNT: begin
+						`debug_print(("Reading %x local blocks", _leb128));
 						local_count <= _leb128;
-						read_local_blocks <= 0;
 						substate <= READ_LOCAL_TYPE;
 					end
 					READ_LOCAL_TYPE: begin
-						local_type <= _leb128;
+						`debug_print(("Local type is %x, have read %x/%x", _leb128, read_local_blocks, local_blocks));
+						local_type <= _leb128; // unused
 						read_local_blocks <= read_local_blocks + 1;
-						if ((read_local_blocks + 1) > local_blocks) begin
-							substate <= READ_LOCAL_COUNT;
-						end else begin
+						if ((read_local_blocks + 1) >= local_blocks) begin
 							substate <= POPULATE_FTE_ENTRY;
+						end else begin
+							substate <= READ_LOCAL_COUNT;
 						end
 					end
 					POPULATE_FTE_ENTRY: begin
@@ -487,7 +491,7 @@ task handle_section(); begin
 						// correct
 						if(((read_func + import_count) == pc_func_id) && first_instruction_r == 0) begin
 							`debug_print(("Starting to read code for START function"));
-							first_instruction_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
+							first_instruction_r <= code_block_base + (current_b-func_start_at-(2*local_count)-2); // FIXME -2
 						end
 
 						if(!rom_ready) begin
@@ -497,8 +501,11 @@ task handle_section(); begin
 							current_b <= current_b + 1;
 							rom_addr_r <= current_b + 1;
 							mem_write_en_r <= 1;
-							mem_addr_r <= code_block_base + (current_b-func_start_at-2); // FIXME -2
+							mem_addr_r <= code_block_base + (current_b-func_start_at-(2*local_count)-2); // FIXME -2
 							mem_data_in_r <= rom_data_out & 8'hFF; // FIXME byte?
+
+							`debug_print(("Code base: %x, current_b: %x, func_start_at: %x, local_count: %x",
+							code_block_base, current_b, func_start_at, local_count));
 
 							if (current_b == (func_len + func_start_at)) begin
 								$display("At byte #%x (==%x), func is done", current_b, rom_data_out);
