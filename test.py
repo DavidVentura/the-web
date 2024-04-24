@@ -1,4 +1,3 @@
-import sys
 import subprocess
 from pathlib import Path
 
@@ -62,7 +61,7 @@ def _test_cases():
 @pytest.mark.parametrize("program", _test_cases())
 def test(tmp_path, program: Path):
     wasm = wat2wasm(program)
-    mem = process_file(wasm, 256)
+    mem = process_file(wasm, 2048)
 
     expects = parse_expects(program)
     expects = [f'+{k}={v}' for k, v in expects.items()]
